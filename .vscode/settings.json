@@ -1,0 +1,5 @@
+{
+  "yaml.schemas": {
+    "swaggerviewer:openapi": "file:///home/qkjk/projects/FE/baseball/baseball-frontend-fresh/baseball-api.yml"
+  }
+}
