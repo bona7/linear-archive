@@ -18,7 +18,6 @@ const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "";
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
-  const isResultPage = router.pathname === "/result";
 
   /* --------- Service Worker 등록 --------- */
   useEffect(() => {
@@ -165,25 +164,6 @@ function MyApp({ Component, pageProps }) {
 
   return (
     <>
-      {/* GA 스크립트 로드 + 자동 page_view 비활성화 */}
-      {GA_ID && (
-        <>
-          <Script
-            id="ga-src"
-            src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
-            strategy="afterInteractive"
-          />
-          <Script id="ga-init" strategy="afterInteractive">
-            {`
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              gtag('js', new Date());
-              gtag('config', '${GA_ID}', { send_page_view: false });
-            `}
-          </Script>
-        </>
-      )}
-
       <Head>
         <title>연표아카이빙</title>
         <meta name="description" content="연표아카이빙" />

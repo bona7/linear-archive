@@ -35,17 +35,6 @@ const onRefreshed = (token: string) => {
 /* ── Request 인터셉터 ───────────────────────── */
 API.interceptors.request.use(
   (config) => {
-    // /games 관련 withCredentials 커스텀
-    const method = config.method?.toLowerCase();
-    const url = config.url ?? "";
-    if (url.includes("/games")) {
-      const isGet = method === "get";
-      const isResultEndpoint = url.endsWith("/result");
-      if (!(isGet && isResultEndpoint)) {
-        config.withCredentials = false;
-      }
-    }
-
     const token = getAccessToken();
     if (token) {
       // Axios v1: headers는 AxiosHeaders 객체일 수 있음
@@ -70,12 +59,7 @@ API.interceptors.response.use(
 
     const url = originalReq.url ?? "";
     // ←– **NEW**: if this is login or signup, just bubble up the error
-    if (
-      url.endsWith("/auth/login") ||
-      url.endsWith("/auth/signup") ||
-      url.endsWith("/auth/email/request") ||
-      url.endsWith("/auth/email/verify")
-    ) {
+    if (url.endsWith("/auth/login") || url.endsWith("/auth/signup")) {
       return Promise.reject(error);
     }
 
@@ -99,13 +83,7 @@ API.interceptors.response.use(
             onRefreshed(newToken);
             return newToken;
           })
-          // 이거때매 401을 받으면 계속 login으로 갔던거임
-          // .catch(() => {
-          //   clearAccessToken();
-          //   // window.location.href = "/login";
 
-          //   throw error;
-          // })
           .catch((err: unknown) => {
             clearAccessToken();
             // ⚠️ 화면 알림은 여기서 하지 않습니다.
