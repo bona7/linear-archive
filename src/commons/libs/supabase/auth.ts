@@ -4,6 +4,7 @@ import { setAccessToken, clearAccessToken } from "../../libraries/token";
 export interface SignUpParams {
   email: string;
   password: string;
+  displayName: string;
 }
 
 export interface SignInParams {
@@ -13,11 +14,17 @@ export interface SignInParams {
 
 /**
  * 회원가입
+ * displayName은 user_metadata에 저장됨
  */
-export async function signUp({ email, password }: SignUpParams) {
+export async function signUp({ email, password, displayName }: SignUpParams) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      data: {
+        display_name: displayName, // user_metadata에 저장
+      },
+    },
   });
 
   if (error) throw error;
@@ -78,4 +85,29 @@ export async function getUser() {
   } = await supabase.auth.getUser();
   if (error) throw error;
   return user;
+}
+
+/**
+ * 현재 사용자의 displayName 가져오기
+ */
+export async function getDisplayName(): Promise<string | null> {
+  const user = await getUser();
+  return (user.user_metadata?.display_name as string) || null;
+}
+
+/**
+ * displayName 업데이트
+ */
+export async function updateDisplayName(displayName: string) {
+  const { data, error } = await supabase.auth.updateUser({
+    data: {
+      display_name: displayName,
+    },
+  });
+
+  if (error) {
+    throw new Error(`Failed to update display name: ${error.message}`);
+  }
+
+  return data;
 }
