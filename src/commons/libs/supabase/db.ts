@@ -178,7 +178,7 @@ export async function createBoard(params: CreateBoardParams) {
 }
 
 /**
- * READ1 - boards와 tags만 가져오기 (이미지 제외)
+ * READ1 - 전체 게시글 조회하되, boards와 tags만 가져오기 (이미지 제외)
  * 현재 인증된 사용자의 board만 반환 (RLS가 자동 필터링)
  */
 export async function readBoardsWithTags(): Promise<BoardWithTags[]> {
@@ -232,8 +232,9 @@ export async function readBoardsWithTags(): Promise<BoardWithTags[]> {
 }
 
 /**
- * READ2 - boards, tags, 그리고 이미지까지 가져오기
+ * READ2 - 전체 게시글을 조회하되, boards, tags, 그리고 이미지까지 가져오기
  * 현재 인증된 사용자의 board만 반환 (RLS가 자동 필터링)
+ * 이건 쓸 일 없음
  */
 export async function readBoardsWithTagsAndImages(): Promise<BoardWithTags[]> {
   // 1. boards와 tags 가져오기
@@ -319,20 +320,6 @@ export async function readBoardById(
   }
 
   return result;
-}
-
-/**
- * 현재 사용자의 board 목록 조회
- * readBoardsWithTags의 래퍼 함수 (이미지 포함 옵션 제공)
- */
-export async function getCurrentUserBoards(
-  includeImage: boolean = false
-): Promise<BoardWithTags[]> {
-  if (includeImage) {
-    return readBoardsWithTagsAndImages();
-  } else {
-    return readBoardsWithTags();
-  }
 }
 
 /**
