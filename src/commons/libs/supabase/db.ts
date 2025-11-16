@@ -179,12 +179,23 @@ export async function createBoard(params: CreateBoardParams) {
 
 /**
  * READ1 - boards와 tags만 가져오기 (이미지 제외)
- * 스키마: N:1 관계이므로 여러 board 반환 가능
+ * 현재 인증된 사용자의 board만 반환 (RLS가 자동 필터링)
  */
-export async function readBoardsWithTags(
-  userId?: string
-): Promise<BoardWithTags[]> {
-  let query = supabase.from("board").select(`
+export async function readBoardsWithTags(): Promise<BoardWithTags[]> {
+  // 현재 사용자 인증 확인
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    throw new Error("User not authenticated");
+  }
+
+  const { data, error } = await supabase
+    .from("board")
+    .select(
+      `
       *,
       board_tag_jointable (
         tag_id,
@@ -194,14 +205,9 @@ export async function readBoardsWithTags(
           tag_color
         )
       )
-    `);
-
-  // userId가 제공되면 필터링
-  if (userId) {
-    query = query.eq("user_id", userId);
-  }
-
-  const { data, error } = await query.order("date", { ascending: false });
+    `
+    )
+    .order("date", { ascending: false });
 
   if (error) {
     throw new Error(`Failed to read boards: ${error.message}`);
@@ -227,13 +233,11 @@ export async function readBoardsWithTags(
 
 /**
  * READ2 - boards, tags, 그리고 이미지까지 가져오기
- * 스키마: N:1 관계이므로 여러 board 반환 가능
+ * 현재 인증된 사용자의 board만 반환 (RLS가 자동 필터링)
  */
-export async function readBoardsWithTagsAndImages(
-  userId?: string
-): Promise<BoardWithTags[]> {
+export async function readBoardsWithTagsAndImages(): Promise<BoardWithTags[]> {
   // 1. boards와 tags 가져오기
-  const boards = await readBoardsWithTags(userId);
+  const boards = await readBoardsWithTags();
 
   // 2. 각 board에 대해 이미지 URL 가져오기
   const boardsWithImages = await Promise.all(
@@ -250,12 +254,23 @@ export async function readBoardsWithTagsAndImages(
 }
 
 /**
- * 단일 board 조회 (tags 포함)
+ * READ3 - 단일 board 조회 (tags, 이미지 모두 포함)
+ * 현재 인증된 사용자의 board만 조회 가능 (RLS가 자동 필터링)
  */
-export async function getBoardById(
+export async function readBoardById(
   boardId: string,
   includeImage: boolean = false
 ): Promise<BoardWithTags | null> {
+  // 현재 사용자 인증 확인
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    throw new Error("User not authenticated");
+  }
+
   const { data, error } = await supabase
     .from("board")
     .select(
@@ -275,6 +290,10 @@ export async function getBoardById(
     .single();
 
   if (error) {
+    if (error.code === "PGRST116") {
+      // 게시글이 없거나 RLS 정책에 의해 접근 불가능한 경우
+      return null;
+    }
     throw new Error(`Failed to get board: ${error.message}`);
   }
 
@@ -304,11 +323,24 @@ export async function getBoardById(
 
 /**
  * 현재 사용자의 board 목록 조회
- * 스키마: N:1 관계이므로 여러 board 반환
+ * readBoardsWithTags의 래퍼 함수 (이미지 포함 옵션 제공)
  */
 export async function getCurrentUserBoards(
   includeImage: boolean = false
 ): Promise<BoardWithTags[]> {
+  if (includeImage) {
+    return readBoardsWithTagsAndImages();
+  } else {
+    return readBoardsWithTags();
+  }
+}
+
+/**
+ * 현재 사용자가 사용한 모든 태그 조회
+ * 태그 자동완성 등에 사용
+ */
+export async function getCurrentUserTags(): Promise<Tag[]> {
+  // 현재 사용자 인증 확인
   const {
     data: { user },
     error: userError,
@@ -318,15 +350,22 @@ export async function getCurrentUserBoards(
     throw new Error("User not authenticated");
   }
 
-  if (includeImage) {
-    return readBoardsWithTagsAndImages(user.id);
-  } else {
-    return readBoardsWithTags(user.id);
+  // tags 테이블에서 직접 조회 (RLS가 자동으로 현재 사용자의 태그만 필터링)
+  const { data, error } = await supabase
+    .from("tags")
+    .select("tag_id, tag_name, tag_color")
+    .order("tag_name", { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to get tags: ${error.message}`);
   }
+
+  return (data || []) as Tag[];
 }
 
 /**
  * UPDATE - board 수정
+ * 현재 인증된 사용자의 board만 수정 가능 (RLS가 자동 필터링)
  */
 export async function updateBoard(
   boardId: string,
@@ -344,7 +383,7 @@ export async function updateBoard(
     throw new Error("User not authenticated");
   }
 
-  // board 업데이트
+  // board 업데이트 (현재 사용자의 board만 수정 가능)
   const boardUpdates: any = {};
   if (updates.description !== undefined)
     boardUpdates.description = updates.description;
@@ -412,33 +451,37 @@ export async function updateBoard(
 
 /**
  * DELETE - board 삭제
+ * 현재 인증된 사용자의 board만 삭제 가능 (RLS가 자동 필터링)
  */
 export async function deleteBoard(boardId: string) {
-  // 현재 사용자 ID 가져오기
+  // 현재 사용자 인증 확인
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
-  if (!user) {
+  if (userError || !user) {
     throw new Error("User not authenticated");
   }
 
-  // 1. board_tag_jointable 삭제
-  await supabase.from("board_tag_jointable").delete().eq("board_id", boardId);
-
-  // 2. 이미지 삭제 (board의 user_id를 가져와야 함)
-  // 먼저 board 정보 가져오기
+  // board 정보 가져오기 (이미지 삭제를 위해 user_id 필요)
   const { data: boardData } = await supabase
     .from("board")
     .select("user_id")
     .eq("board_id", boardId)
     .single();
 
-  if (boardData) {
-    const { deletePostImage } = await import("./storage");
-    await deletePostImage(boardId, boardData.user_id);
+  if (!boardData) {
+    throw new Error("Board not found");
   }
 
-  // 3. board 삭제
+  // 1. board_tag_jointable 삭제
+  await supabase.from("board_tag_jointable").delete().eq("board_id", boardId);
+
+  // 2. 이미지 삭제
+  const { deletePostImage } = await import("./storage");
+  await deletePostImage(boardId, boardData.user_id);
+
+  // 3. board 삭제 (RLS가 자동으로 현재 사용자의 board만 삭제 허용)
   const { error } = await supabase
     .from("board")
     .delete()
