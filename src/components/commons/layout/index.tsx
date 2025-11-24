@@ -16,4 +16,3 @@ export default function Layout(props: ILayoutProps): JSX.Element {
     </>
   );
 }
-// _app.tsx에서 <Component/>가 {props.children}으로 쏙들어오고 LayOut컴포넌트 전체를 땡겨온다(_app.tsx쪽으로)
