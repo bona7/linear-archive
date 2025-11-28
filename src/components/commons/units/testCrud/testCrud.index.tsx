@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   createBoard,
-  getCurrentUserBoards,
+  readBoardsWithTags,
   updateBoard,
   deleteBoard,
   BoardWithTags,
@@ -48,7 +48,7 @@ export default function TestCrud() {
 
   const loadBoards = async () => {
     try {
-      const data = await getCurrentUserBoards(true);
+      const data = await readBoardsWithTags();
       setBoards(data);
     } catch (err: any) {
       setError(err.message || "게시글 로드 실패");
