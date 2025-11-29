@@ -16,7 +16,14 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "allowSyntheticDefaultImports": true,
-    "types": ["jest", "node"]
+    "types": ["jest", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@components/*": ["src/components/*"],
+      "@commons/*": ["src/commons/*"],
+      "@libs/*": ["src/commons/libs/*"]
+    }
   },
   "include": [
     "next-env.d.ts",
