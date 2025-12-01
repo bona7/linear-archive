@@ -94,13 +94,14 @@ export async function createBoard(params: CreateBoardParams) {
     const tagIds: string[] = [];
 
     for (const tag of params.tags) {
-      // 기존 태그 확인 (tag_name으로)
+      // 기존 태그 확인 (tag_name과 user_id로)
       let tagId: string;
 
       const { data: existingTag } = await supabase
         .from("tags")
         .select("tag_id")
         .eq("tag_name", tag.tag_name)
+        .eq("user_id", userId)
         .single();
 
       if (existingTag) {
@@ -114,6 +115,7 @@ export async function createBoard(params: CreateBoardParams) {
             {
               tag_name: tag.tag_name,
               tag_color: tag.tag_color,
+              user_id: userId,
             },
           ])
           .select()
@@ -398,6 +400,7 @@ export async function updateBoard(
         .from("tags")
         .select("tag_id")
         .eq("tag_name", tag.tag_name)
+        .eq("user_id", user.id)
         .single();
 
       let tagId: string;
@@ -406,7 +409,13 @@ export async function updateBoard(
       } else {
         const { data: newTag } = await supabase
           .from("tags")
-          .insert([{ tag_name: tag.tag_name, tag_color: tag.tag_color }])
+          .insert([
+            {
+              tag_name: tag.tag_name,
+              tag_color: tag.tag_color,
+              user_id: user.id,
+            },
+          ])
           .select()
           .single();
         tagId = newTag!.tag_id;
