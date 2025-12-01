@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import {
   createBoard,
-  getCurrentUserBoards,
   updateBoard,
   deleteBoard,
   BoardWithTags,
+  readBoardsWithTags,
 } from "../../../../commons/libs/supabase/db";
 import { getUser } from "../../../../commons/libs/supabase/auth";
 import {
@@ -48,7 +48,7 @@ export default function TestCrud() {
 
   const loadBoards = async () => {
     try {
-      const data = await getCurrentUserBoards(true);
+      const data = await readBoardsWithTags();
       setBoards(data);
     } catch (err: any) {
       setError(err.message || "게시글 로드 실패");

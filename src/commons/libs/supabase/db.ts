@@ -259,8 +259,7 @@ export async function readBoardsWithTagsAndImages(): Promise<BoardWithTags[]> {
  * 현재 인증된 사용자의 board만 조회 가능 (RLS가 자동 필터링)
  */
 export async function readBoardById(
-  boardId: string,
-  includeImage: boolean = false
+  boardId: string
 ): Promise<BoardWithTags | null> {
   // 현재 사용자 인증 확인
   const {
@@ -314,9 +313,9 @@ export async function readBoardById(
     tags: tags,
   };
 
-  // 이미지 포함 여부
-  if (includeImage) {
-    result.image_url = await getPostImageUrl(boardId, data.user_id);
+  const imageUrl = await getPostImageUrl(boardId, data.user_id);
+  if (imageUrl) {
+    result.image_url = imageUrl;
   }
 
   return result;
