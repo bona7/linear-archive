@@ -1,9 +1,9 @@
-import MainPage from "../src/components/commons/units/mainPage/mainPage.index";
+import IntroPage from "../src/components/commons/units/onBoarding/introPage";
 
 export default function Home() {
   return (
     <>
-      <MainPage />
+      <IntroPage />
     </>
   );
 }

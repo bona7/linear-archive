@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import {
   createBoard,
+  readBoardsWithTags,
   updateBoard,
   deleteBoard,
   BoardWithTags,
-  readBoardsWithTags,
 } from "../../../../commons/libs/supabase/db";
 import { getUser } from "../../../../commons/libs/supabase/auth";
 import {

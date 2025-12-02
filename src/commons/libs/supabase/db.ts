@@ -59,12 +59,23 @@ export async function createBoard(params: CreateBoardParams) {
     // 3. 이미지 업로드 (이미지가 있는 경우)
     let imageUrl: string | null = null;
     if (params.image) {
-      const { publicUrl } = await uploadPostImage({
-        file: params.image,
-        postUuid: boardId,
-        userId: userId,
-      });
-      imageUrl = publicUrl;
+      console.log("--- [DEBUG] 이미지 업로드 시작 ---");
+      console.log("File:", params.image);
+      console.log("Board ID:", boardId);
+      console.log("User ID:", userId);
+      try {
+        const { publicUrl } = await uploadPostImage({
+          file: params.image,
+          postUuid: boardId,
+          userId: userId,
+        });
+        imageUrl = publicUrl;
+        console.log("--- [DEBUG] 이미지 업로드 성공 ---");
+        console.log("Public URL:", imageUrl);
+      } catch (uploadError: any) {
+        console.error("--- [DEBUG] 이미지 업로드 실패 ---", uploadError);
+        throw new Error(`Image upload failed: ${uploadError.message}`);
+      }
     }
 
     // 4. board 테이블에 삽입
@@ -79,7 +90,7 @@ export async function createBoard(params: CreateBoardParams) {
         },
       ])
       .select()
-      .single();
+      .maybeSingle();
 
     if (boardError) {
       // 이미지가 업로드되었다면 롤백
@@ -102,7 +113,7 @@ export async function createBoard(params: CreateBoardParams) {
         .select("tag_id")
         .eq("tag_name", tag.tag_name)
         .eq("user_id", userId)
-        .single();
+        .maybeSingle();
 
       if (existingTag) {
         // 기존 태그 사용
