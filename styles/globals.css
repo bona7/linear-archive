@@ -1,3 +1,6 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 html,
 body,
 * {
@@ -13,4 +16,47 @@ a {
 * {
   box-sizing: border-box;
 }
-/* 예: global.css 혹은 emotion의 Global 스타일에서 */
+
+/* Timeline scrollbar - hidden by default, shown on hover */
+.timeline-container {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: transparent transparent; /* Firefox - transparent scrollbar */
+}
+
+.timeline-container::-webkit-scrollbar {
+  height: 8px; /* Chrome, Safari, Edge */
+}
+
+.timeline-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.timeline-container::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+
+.timeline-container:hover {
+  scrollbar-color: #000000 #f2f0eb; /* Firefox - black scrollbar on hover */
+}
+
+.timeline-container:hover::-webkit-scrollbar-track {
+  background: #f2f0eb;
+}
+
+.timeline-container:hover::-webkit-scrollbar-thumb {
+  background-color: #000000;
+  border: 1px solid #f2f0eb;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
