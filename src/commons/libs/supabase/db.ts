@@ -105,13 +105,14 @@ export async function createBoard(params: CreateBoardParams) {
     const tagIds: string[] = [];
 
     for (const tag of params.tags) {
-      // 기존 태그 확인 (tag_name으로)
+      // 기존 태그 확인 (tag_name과 user_id로)
       let tagId: string;
 
       const { data: existingTag } = await supabase
         .from("tags")
         .select("tag_id")
         .eq("tag_name", tag.tag_name)
+        .eq("user_id", userId)
         .maybeSingle();
 
       if (existingTag) {
@@ -125,6 +126,7 @@ export async function createBoard(params: CreateBoardParams) {
             {
               tag_name: tag.tag_name,
               tag_color: tag.tag_color,
+              user_id: userId,
             },
           ])
           .select()
@@ -270,8 +272,7 @@ export async function readBoardsWithTagsAndImages(): Promise<BoardWithTags[]> {
  * 현재 인증된 사용자의 board만 조회 가능 (RLS가 자동 필터링)
  */
 export async function readBoardById(
-  boardId: string,
-  includeImage: boolean = false
+  boardId: string
 ): Promise<BoardWithTags | null> {
   // 현재 사용자 인증 확인
   const {
@@ -325,9 +326,9 @@ export async function readBoardById(
     tags: tags,
   };
 
-  // 이미지 포함 여부
-  if (includeImage) {
-    result.image_url = await getPostImageUrl(boardId, data.user_id);
+  const imageUrl = await getPostImageUrl(boardId, data.user_id);
+  if (imageUrl) {
+    result.image_url = imageUrl;
   }
 
   return result;
@@ -410,6 +411,7 @@ export async function updateBoard(
         .from("tags")
         .select("tag_id")
         .eq("tag_name", tag.tag_name)
+        .eq("user_id", user.id)
         .single();
 
       let tagId: string;
@@ -418,7 +420,13 @@ export async function updateBoard(
       } else {
         const { data: newTag } = await supabase
           .from("tags")
-          .insert([{ tag_name: tag.tag_name, tag_color: tag.tag_color }])
+          .insert([
+            {
+              tag_name: tag.tag_name,
+              tag_color: tag.tag_color,
+              user_id: user.id,
+            },
+          ])
           .select()
           .single();
         tagId = newTag!.tag_id;
