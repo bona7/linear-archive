@@ -1,6 +1,7 @@
 import { Timeline } from "./components/Timeline";
 import { Toolbar } from "./components/Toolbar";
 import { ArchiveModal } from "./components/ArchiveModal";
+import { ViewArchiveModal } from "./components/ViewArchiveModal";
 import { SearchBar } from "./components/SearchBar";
 import { LoginModal } from "./components/LoginModal";
 import { ProfileMenu } from "./components/ProfileMenu";
@@ -22,7 +23,8 @@ interface NodeData {
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [modalPosition, setModalPosition] = useState<{
     x: number;
     y: number;
@@ -58,18 +60,28 @@ export default function App() {
   ) => {
     setSelectedNodeId(nodeId);
     setModalPosition(position);
-    setIsModalOpen(true);
+    setIsViewModalOpen(true); // ViewArchiveModal 열기
   };
 
   const handleToolbarNewArchive = () => {
     setSelectedNodeId(null);
     setModalPosition(null);
-    setIsModalOpen(true);
+    setIsEditModalOpen(true); // ArchiveModal 열기 (새 아카이브 생성)
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
+  const handleCloseViewModal = () => {
+    setIsViewModalOpen(false);
     setSelectedNodeId(null);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setSelectedNodeId(null);
+  };
+
+  const handleEditArchive = () => {
+    setIsViewModalOpen(false);
+    setIsEditModalOpen(true); // ArchiveModal 열기 (편집 모드)
   };
 
   const handleSaveArchive = (
@@ -131,7 +143,7 @@ export default function App() {
         timelineRef.current.scrollToDate(date);
       }
     }
-    handleCloseModal();
+    handleCloseEditModal();
   };
 
   const handleDeleteArchive = () => {
@@ -143,7 +155,7 @@ export default function App() {
         return newMap;
       });
     }
-    handleCloseModal();
+    handleCloseEditModal();
   };
 
   const handleDateSelect = (date: Date) => {
@@ -287,10 +299,20 @@ export default function App() {
           <ProfileMenu onLogout={handleLogout} userNickname={userNickname} />
         )}
 
-        {/* Archive Modal */}
+        {/* View Archive Modal */}
+        <ViewArchiveModal
+          isOpen={isViewModalOpen}
+          onClose={handleCloseViewModal}
+          onEdit={handleEditArchive}
+          currentNodeData={
+            selectedNodeId !== null ? nodeDataMap[selectedNodeId] : undefined
+          }
+        />
+
+        {/* Edit/Create Archive Modal */}
         <ArchiveModal
-          isOpen={isModalOpen}
-          onClose={handleCloseModal}
+          isOpen={isEditModalOpen}
+          onClose={handleCloseEditModal}
           onSave={handleSaveArchive}
           onDelete={handleDeleteArchive}
           position={modalPosition}

@@ -46,7 +46,6 @@ export function ArchiveModal({
     currentNodeData?.description || ""
   );
   const [isTagCustomizerOpen, setIsTagCustomizerOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(!currentNodeData); // Start in view mode if editing existing node
   const tagButtonRef = useRef<HTMLButtonElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -55,7 +54,6 @@ export function ArchiveModal({
     if (isOpen) {
       setSelectedTag(currentNodeData?.tag || null);
       setDescription(currentNodeData?.description || "");
-      setIsEditMode(!currentNodeData); // Reset edit mode based on whether it's a new or existing node
       if (currentNodeData?.date) {
         setSelectedYear(currentNodeData.date.getFullYear());
         setSelectedMonth(currentNodeData.date.getMonth());
@@ -162,26 +160,9 @@ export function ArchiveModal({
               opacity: 0.5,
             }}
           >
-            {currentNodeData
-              ? isEditMode
-                ? "EDIT_ARCHIVE"
-                : "VIEW_ARCHIVE"
-              : "NEW_ARCHIVE"}
+            {currentNodeData ? "EDIT_ARCHIVE" : "NEW_ARCHIVE"}
           </span>
           <div className="flex items-center gap-2">
-            {/* Edit Button - Only show in view mode for existing nodes */}
-            {currentNodeData && !isEditMode && (
-              <button
-                onClick={() => setIsEditMode(true)}
-                className="border border-black px-3 py-1 hover:bg-black hover:text-[#F2F0EB] transition-colors"
-                style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
-                  fontSize: "11px",
-                }}
-              >
-                수정
-              </button>
-            )}
             <button
               onClick={onClose}
               className="border border-black w-6 h-6 flex items-center justify-center hover:bg-black hover:text-[#F2F0EB] transition-colors"
@@ -196,7 +177,7 @@ export function ArchiveModal({
         <div
           className="p-4 overflow-y-auto"
           style={{
-            paddingBottom: isEditMode ? "16px" : "16px",
+            paddingBottom: "16px",
             maxHeight: "calc(90vh - 60px)",
           }}
         >
@@ -212,11 +193,7 @@ export function ArchiveModal({
               <span style={{ color: "#D32F2F" }}>*</span>
               <span>태그 타입</span>
             </div>
-            <div
-              className={`flex items-center gap-3 ${
-                isEditMode ? "border border-black bg-white p-3" : ""
-              }`}
-            >
+            <div className="flex items-center gap-3 border border-black bg-white p-3">
               {/* Selected Tag - Fixed Left */}
               {selectedTag && (
                 <div
@@ -242,61 +219,56 @@ export function ArchiveModal({
                 </div>
               )}
 
-              {/* Scrollable Tag List - Only in edit mode */}
-              {isEditMode && (
-                <>
-                  <div
-                    className="flex-1 overflow-x-auto"
-                    style={{ scrollbarWidth: "thin" }}
-                  >
-                    <div className="flex items-center gap-2">
-                      {/* Recent Tags */}
-                      {recentTags.map((tag, index) => (
-                        <button
-                          key={index}
-                          onClick={() => handleSelectRecentTag(tag)}
-                          className="border border-gray-300 px-2.5 py-1.5 flex items-center gap-1.5 bg-white opacity-60 hover:opacity-100 transition-opacity shrink-0"
-                        >
-                          <div
-                            className="border border-black"
-                            style={{
-                              width: "10px",
-                              height: "10px",
-                              backgroundColor: tag.color,
-                            }}
-                          />
-                          <span
-                            style={{
-                              fontFamily:
-                                "SF Mono, Menlo, Monaco, Consolas, monospace",
-                              fontSize: "11px",
-                            }}
-                          >
-                            {tag.name}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Add Tag Button - Fixed Right */}
-                  <button
-                    ref={tagButtonRef}
-                    onClick={() => setIsTagCustomizerOpen(!isTagCustomizerOpen)}
-                    className="border border-black px-3 py-1.5 bg-white hover:bg-black hover:text-white transition-colors shrink-0"
-                  >
-                    <span
-                      style={{
-                        fontFamily:
-                          "SF Mono, Menlo, Monaco, Consolas, monospace",
-                        fontSize: "12px",
-                      }}
+              {/* Scrollable Tag List */}
+              <div
+                className="flex-1 overflow-x-auto"
+                style={{ scrollbarWidth: "thin" }}
+              >
+                <div className="flex items-center gap-2">
+                  {/* Recent Tags */}
+                  {recentTags.map((tag, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleSelectRecentTag(tag)}
+                      className="border border-gray-300 px-2.5 py-1.5 flex items-center gap-1.5 bg-white opacity-60 hover:opacity-100 transition-opacity shrink-0"
                     >
-                      +
-                    </span>
-                  </button>
-                </>
-              )}
+                      <div
+                        className="border border-black"
+                        style={{
+                          width: "10px",
+                          height: "10px",
+                          backgroundColor: tag.color,
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontFamily:
+                            "SF Mono, Menlo, Monaco, Consolas, monospace",
+                          fontSize: "11px",
+                        }}
+                      >
+                        {tag.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add Tag Button - Fixed Right */}
+              <button
+                ref={tagButtonRef}
+                onClick={() => setIsTagCustomizerOpen(!isTagCustomizerOpen)}
+                className="border border-black px-3 py-1.5 bg-white hover:bg-black hover:text-white transition-colors shrink-0"
+              >
+                <span
+                  style={{
+                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    fontSize: "12px",
+                  }}
+                >
+                  +
+                </span>
+              </button>
             </div>
           </div>
 
@@ -332,13 +304,11 @@ export function ArchiveModal({
                     <select
                       value={selectedYear}
                       onChange={(e) => setSelectedYear(Number(e.target.value))}
-                      disabled={!isEditMode}
                       className="flex-1 border border-black bg-white px-1 py-1 outline-none"
                       style={{
                         fontFamily:
                           "SF Mono, Menlo, Monaco, Consolas, monospace",
                         fontSize: "11px",
-                        opacity: isEditMode ? 1 : 0.6,
                       }}
                     >
                       {years.map((year) => (
@@ -350,13 +320,11 @@ export function ArchiveModal({
                     <select
                       value={selectedMonth}
                       onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                      disabled={!isEditMode}
                       className="flex-1 border border-black bg-white px-1 py-1 outline-none"
                       style={{
                         fontFamily:
                           "SF Mono, Menlo, Monaco, Consolas, monospace",
                         fontSize: "11px",
-                        opacity: isEditMode ? 1 : 0.6,
                       }}
                     >
                       {months.map((month, index) => (
@@ -392,8 +360,7 @@ export function ArchiveModal({
                     {daysInMonth.map((day) => (
                       <button
                         key={day}
-                        onClick={() => isEditMode && setSelectedDay(day)}
-                        disabled={!isEditMode}
+                        onClick={() => setSelectedDay(day)}
                         className={`text-center py-1 border border-black transition-colors ${
                           selectedDay === day
                             ? "text-[#F2F0EB]"
@@ -405,7 +372,7 @@ export function ArchiveModal({
                           fontSize: "10px",
                           backgroundColor:
                             selectedDay === day ? "#3A3834" : undefined,
-                          cursor: isEditMode ? "pointer" : "default",
+                          cursor: "pointer",
                         }}
                       >
                         {day}
@@ -429,12 +396,10 @@ export function ArchiveModal({
                   이미지
                 </div>
                 <button
-                  disabled={!isEditMode}
                   className="w-full h-48 bg-white hover:bg-[#F2F0EB] transition-colors flex items-center justify-center"
                   style={{
                     border: "1px solid rgba(0,0,0,0.3)",
-                    cursor: isEditMode ? "pointer" : "default",
-                    opacity: isEditMode ? 1 : 0.6,
+                    cursor: "pointer",
                   }}
                 >
                   <Plus size={40} strokeWidth={1} style={{ opacity: 0.2 }} />
@@ -461,13 +426,11 @@ export function ArchiveModal({
                   className="bg-white p-3 flex items-center justify-center gap-2"
                   style={{
                     border: "1px solid rgba(0,0,0,0.3)",
-                    opacity: isEditMode ? 1 : 0.6,
                   }}
                 >
                   <select
                     value={selectedHour}
                     onChange={(e) => setSelectedHour(Number(e.target.value))}
-                    disabled={!isEditMode}
                     className="bg-white px-2 py-1 outline-none"
                     style={{
                       fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
@@ -493,7 +456,6 @@ export function ArchiveModal({
                   <select
                     value={selectedMinute}
                     onChange={(e) => setSelectedMinute(Number(e.target.value))}
-                    disabled={!isEditMode}
                     className="bg-white px-2 py-1 outline-none"
                     style={{
                       fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
@@ -562,13 +524,11 @@ export function ArchiveModal({
                     placeholder=""
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    disabled={!isEditMode}
                     className="w-full h-full bg-transparent outline-none resize-none relative z-10"
                     style={{
                       fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
                       fontSize: "12px",
                       lineHeight: "1.5",
-                      opacity: isEditMode ? 1 : 0.8,
                     }}
                   />
                 </div>
@@ -576,21 +536,37 @@ export function ArchiveModal({
             </div>
           </div>
 
-          {/* Bottom: Save Button (and Delete for existing nodes) - Only in edit mode */}
-          {isEditMode && (
-            <div className="flex gap-2">
+          {/* Bottom: Save Button (and Delete for existing nodes) */}
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              className={`text-[#F2F0EB] py-2.5 border border-black transition-colors ${
+                currentNodeData ? "flex-1" : "w-full"
+              }`}
+              style={{ backgroundColor: "#8B857D" }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = "#3A3834")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = "#8B857D")
+              }
+            >
+              <span
+                style={{
+                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontSize: "13px",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                저장
+              </span>
+            </button>
+
+            {/* Delete Button - Only show when editing existing node */}
+            {currentNodeData && (
               <button
-                onClick={handleSave}
-                className={`text-[#F2F0EB] py-2.5 border border-black transition-colors ${
-                  currentNodeData ? "flex-1" : "w-full"
-                }`}
-                style={{ backgroundColor: "#8B857D" }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.backgroundColor = "#3A3834")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor = "#8B857D")
-                }
+                onClick={onDelete}
+                className="px-6 py-2.5 border border-red-600 text-red-600 hover:bg-red-600 hover:text-white transition-colors bg-white"
               >
                 <span
                   style={{
@@ -599,29 +575,11 @@ export function ArchiveModal({
                     letterSpacing: "0.05em",
                   }}
                 >
-                  저장
+                  삭제
                 </span>
               </button>
-
-              {/* Delete Button - Only show when editing existing node */}
-              {currentNodeData && (
-                <button
-                  onClick={onDelete}
-                  className="px-6 py-2.5 border border-red-600 text-red-600 hover:bg-red-600 hover:text-white transition-colors bg-white"
-                >
-                  <span
-                    style={{
-                      fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
-                      fontSize: "13px",
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    삭제
-                  </span>
-                </button>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
