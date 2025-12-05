@@ -1,5 +1,6 @@
 import { supabase } from "./client";
 import { uploadPostImage, getPostImageUrl } from "./storage";
+import { CallEmbedding } from "../lambda/embeddingClient";
 
 // 타입 정의
 export interface Board {
@@ -164,6 +165,26 @@ export async function createBoard(params: CreateBoardParams) {
       .from("tags")
       .select("*")
       .in("tag_id", tagIds);
+
+    // 8. embedding lambda call (fire and forget with delay)
+    // doesnt matter if it fails
+    const tagNamesStr = (params.tags ?? [])
+      .map((t) => t.tag_name)
+      .filter(Boolean)
+      .join(", ");
+
+    // 8. Call embedding after board creation completes (fire and forget)
+    // Don't await - let it run in background without blocking the response
+    CallEmbedding({
+      user_id: userId,
+      board_id: boardId,
+      image: imageUrl ?? null,
+      description: params.description ?? "",
+      tags: tagNamesStr ?? "",
+      date: params.date ?? Date.now().toString(),
+    }).catch((embedErr) => {
+      console.warn("Embedding call failed:", embedErr);
+    });
 
     return {
       ...boardData,
