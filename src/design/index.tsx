@@ -316,7 +316,6 @@ export default function App() {
           onSave={handleSaveArchive}
           onDelete={handleDeleteArchive}
           position={modalPosition}
-          recentTags={recentTags}
           currentNodeData={
             selectedNodeId !== null ? nodeDataMap[selectedNodeId] : undefined
           }

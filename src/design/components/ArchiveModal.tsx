@@ -1,6 +1,12 @@
 import { X, Plus } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import { TagCustomizer } from "./TagCustomizer";
+import { TagCreator } from "./TagCreator";
+import {
+  getCurrentUserTags,
+  Tag,
+  createBoard,
+  updateBoard,
+} from "../../commons/libs/supabase/db";
 
 interface NodeTag {
   name: string;
@@ -8,7 +14,7 @@ interface NodeTag {
 }
 
 interface NodeData {
-  id: number;
+  id: string;
   tag?: NodeTag;
   title?: string;
   description?: string;
@@ -21,7 +27,6 @@ interface ArchiveModalProps {
   onSave: (tag: NodeTag | null, description: string, date: Date | null) => void;
   onDelete: () => void;
   position?: { x: number; y: number } | null;
-  recentTags: NodeTag[];
   currentNodeData?: NodeData;
 }
 
@@ -31,7 +36,6 @@ export function ArchiveModal({
   onSave,
   onDelete,
   position,
-  recentTags,
   currentNodeData,
 }: ArchiveModalProps) {
   const [selectedYear, setSelectedYear] = useState<number>(2025);
@@ -39,21 +43,55 @@ export function ArchiveModal({
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [selectedHour, setSelectedHour] = useState<number>(12);
   const [selectedMinute, setSelectedMinute] = useState<number>(0);
-  const [selectedTag, setSelectedTag] = useState<NodeTag | null>(
-    currentNodeData?.tag || null
+  // selectedTag를 selectedTags 배열로 변경
+  const [selectedTags, setSelectedTags] = useState<NodeTag[]>(
+    currentNodeData?.tag ? [currentNodeData.tag] : []
   );
   const [description, setDescription] = useState(
     currentNodeData?.description || ""
   );
   const [isTagCustomizerOpen, setIsTagCustomizerOpen] = useState(false);
+  const [recentTags, setRecentTags] = useState<NodeTag[]>([]);
+  const [isLoadingTags, setIsLoadingTags] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const tagButtonRef = useRef<HTMLButtonElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // 태그 불러오기
+  useEffect(() => {
+    const loadTags = async () => {
+      if (!isOpen) return;
+
+      setIsLoadingTags(true);
+      try {
+        const tags = await getCurrentUserTags();
+        // Tag 타입을 NodeTag 타입으로 변환
+        const nodeTags: NodeTag[] = tags.map((tag) => ({
+          name: tag.tag_name,
+          color: tag.tag_color,
+        }));
+        setRecentTags(nodeTags);
+      } catch (error) {
+        console.error("Failed to load tags:", error);
+        setRecentTags([]);
+      } finally {
+        setIsLoadingTags(false);
+      }
+    };
+
+    loadTags();
+  }, [isOpen]);
 
   // Update state when currentNodeData changes
   useEffect(() => {
     if (isOpen) {
-      setSelectedTag(currentNodeData?.tag || null);
+      setSelectedTags(currentNodeData?.tag ? [currentNodeData.tag] : []);
       setDescription(currentNodeData?.description || "");
+      setErrorMessage(null); // 모달이 열릴 때 에러 메시지 초기화
       if (currentNodeData?.date) {
         setSelectedYear(currentNodeData.date.getFullYear());
         setSelectedMonth(currentNodeData.date.getMonth());
@@ -67,26 +105,165 @@ export function ArchiveModal({
         setSelectedHour(12);
         setSelectedMinute(0);
       }
+      setSelectedImage(null);
+      setSelectedImageFile(null);
     }
   }, [isOpen, currentNodeData]);
 
+  // 선택된 날짜가 유효한지 확인하고 조정
+  useEffect(() => {
+    if (selectedDay !== null) {
+      const daysInSelectedMonth = getDaysInMonth();
+      // 선택된 일이 해당 월의 일수보다 크면 조정
+      if (selectedDay > daysInSelectedMonth) {
+        setSelectedDay(daysInSelectedMonth);
+      }
+    }
+  }, [selectedYear, selectedMonth]);
+
   if (!isOpen) return null;
 
-  const handleSave = () => {
-    const date = selectedDay
-      ? new Date(
-          selectedYear,
-          selectedMonth,
-          selectedDay,
-          selectedHour,
-          selectedMinute
-        )
-      : null;
-    onSave(selectedTag, description, date);
+  const handleSave = async () => {
+    // 필수 입력 검증
+    if (selectedTags.length === 0) {
+      setErrorMessage("태그를 선택해주세요.");
+      return;
+    }
+
+    if (selectedDay === null) {
+      setErrorMessage("날짜를 선택해주세요.");
+      return;
+    }
+
+    // 검증 통과 시 에러 메시지 초기화
+    setErrorMessage(null);
+    setIsSaving(true);
+
+    try {
+      const date = new Date(
+        selectedYear,
+        selectedMonth,
+        selectedDay,
+        selectedHour,
+        selectedMinute
+      );
+
+      // ISO 문자열로 변환 (YYYY-MM-DDTHH:mm:ss 형식)
+      const dateString = date.toISOString();
+
+      // 태그 배열을 createBoard 형식으로 변환
+      const tags = selectedTags.map((tag) => ({
+        tag_name: tag.name,
+        tag_color: tag.color,
+      }));
+
+      if (currentNodeData) {
+        // 기존 아카이브 수정
+        const result = await updateBoard(currentNodeData.id, {
+          description: description || undefined,
+          date: dateString,
+          tags: tags,
+          image: selectedImageFile || undefined,
+        });
+
+        console.log("아카이브 수정 완료:", {
+          id: currentNodeData.id,
+          description: description || undefined,
+          date: dateString,
+          tags: tags,
+          image: selectedImageFile ? "이미지 포함" : "이미지 없음",
+          result: result,
+        });
+      } else {
+        // 새 아카이브 생성
+        const result = await createBoard({
+          description: description || undefined,
+          date: dateString,
+          tags: tags,
+          image: selectedImageFile || undefined,
+        });
+
+        console.log("아카이브 생성 완료:", {
+          description: description || undefined,
+          date: dateString,
+          tags: tags,
+          image: selectedImageFile ? "이미지 포함" : "이미지 없음",
+          result: result,
+        });
+      }
+
+      // 성공 시 부모 컴포넌트의 onSave 호출 (기존 동작 유지)
+      onSave(
+        selectedTags.length > 0 ? selectedTags[0] : null,
+        description,
+        date
+      );
+
+      // 모달 닫기
+      onClose();
+    } catch (error: any) {
+      console.error("Failed to save archive:", error);
+      setErrorMessage(
+        error.message || "저장 중 오류가 발생했습니다. 다시 시도해주세요."
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleSelectRecentTag = (tag: NodeTag) => {
-    setSelectedTag(tag);
+  const handleSelectTag = (tag: NodeTag) => {
+    // 태그 토글: 이미 선택되어 있으면 제거, 없으면 추가
+    setSelectedTags((prev) => {
+      const isSelected = prev.some(
+        (t) => t.name === tag.name && t.color === tag.color
+      );
+
+      if (isSelected) {
+        // 제거
+        return prev.filter(
+          (t) => !(t.name === tag.name && t.color === tag.color)
+        );
+      } else {
+        // 추가
+        return [...prev, tag];
+      }
+    });
+  };
+
+  // 태그가 선택되어 있는지 확인하는 헬퍼 함수
+  const isTagSelected = (tag: NodeTag) => {
+    return selectedTags.some(
+      (t) => t.name === tag.name && t.color === tag.color
+    );
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith("image/")) {
+      setSelectedImageFile(file);
+      // FileReader를 사용하여 이미지 미리보기 URL 생성
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleImageButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleRemoveImage = (e?: React.MouseEvent | React.KeyboardEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    setSelectedImage(null);
+    setSelectedImageFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   // Calendar data
@@ -104,7 +281,14 @@ export function ArchiveModal({
     "NOV",
     "DEC",
   ];
-  const years = [2024, 2025];
+
+  // 연도 배열: 1950년부터 현재 연도까지 (최신 연도부터 표시)
+  const currentYear = new Date().getFullYear();
+  const years = Array.from(
+    { length: currentYear - 1950 + 1 },
+    (_, i) => 1950 + i
+  ).reverse();
+
   const daysOfWeek = ["월", "화", "수", "목", "금", "토", "일"];
 
   // Calculate days in selected month
@@ -194,76 +378,110 @@ export function ArchiveModal({
               <span>태그 타입</span>
             </div>
             <div className="flex items-center gap-3 border border-black bg-white p-3">
-              {/* Selected Tag - Fixed Left */}
-              {selectedTag && (
-                <div
-                  className="flex items-center gap-2 border border-black bg-white shrink-0"
-                  style={{ padding: "7px 11px" }}
-                >
-                  <div
-                    className="border border-black"
-                    style={{
-                      width: "11.5px",
-                      height: "11.5px",
-                      backgroundColor: selectedTag.color,
-                    }}
-                  />
+              {/* 통합된 스크롤 영역 - 선택된 태그 + 불러온 태그 */}
+              <div
+                className="flex-1 overflow-x-auto flex items-center gap-2"
+                style={{ scrollbarWidth: "thin" }}
+              >
+                {/* 선택된 태그들 */}
+                {selectedTags.map((tag, index) => (
+                  <button
+                    key={`selected-${tag.name}-${tag.color}-${index}`}
+                    onClick={() => handleSelectTag(tag)}
+                    className="flex items-center gap-2 border border-black bg-white shrink-0"
+                    style={{ padding: "7px 11px" }}
+                  >
+                    <div
+                      className="border border-black"
+                      style={{
+                        width: "11.5px",
+                        height: "11.5px",
+                        backgroundColor: tag.color,
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontFamily:
+                          "SF Mono, Menlo, Monaco, Consolas, monospace",
+                        fontSize: "12.5px",
+                      }}
+                    >
+                      {tag.name}
+                    </span>
+                  </button>
+                ))}
+
+                {/* 불러온 태그들 - 선택된 태그 제외 */}
+                {isLoadingTags ? (
                   <span
                     style={{
                       fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
-                      fontSize: "12.5px",
+                      fontSize: "11px",
+                      opacity: 0.5,
                     }}
                   >
-                    {selectedTag.name}
+                    태그 불러오는 중...
                   </span>
-                </div>
-              )}
+                ) : (
+                  (() => {
+                    // 선택된 태그를 제외한 태그 목록
+                    const filteredTags = recentTags.filter(
+                      (tag) => !isTagSelected(tag)
+                    );
 
-              {/* Scrollable Tag List */}
-              <div
-                className="flex-1 overflow-x-auto"
-                style={{ scrollbarWidth: "thin" }}
-              >
-                <div className="flex items-center gap-2">
-                  {/* Recent Tags */}
-                  {recentTags.map((tag, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleSelectRecentTag(tag)}
-                      className="border border-gray-300 px-2.5 py-1.5 flex items-center gap-1.5 bg-white opacity-60 hover:opacity-100 transition-opacity shrink-0"
-                    >
-                      <div
-                        className="border border-black"
-                        style={{
-                          width: "10px",
-                          height: "10px",
-                          backgroundColor: tag.color,
-                        }}
-                      />
-                      <span
-                        style={{
-                          fontFamily:
-                            "SF Mono, Menlo, Monaco, Consolas, monospace",
-                          fontSize: "11px",
-                        }}
-                      >
-                        {tag.name}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                    return filteredTags.length === 0
+                      ? selectedTags.length === 0 && (
+                          <span
+                            style={{
+                              fontFamily:
+                                "SF Mono, Menlo, Monaco, Consolas, monospace",
+                              fontSize: "11px",
+                              opacity: 0.5,
+                            }}
+                          >
+                            태그가 없습니다
+                          </span>
+                        )
+                      : filteredTags.map((tag, index) => (
+                          <button
+                            key={index}
+                            onClick={() => handleSelectTag(tag)}
+                            className="border border-gray-300 px-2.5 py-1.5 flex items-center gap-1.5 bg-white opacity-60 hover:opacity-100 transition-opacity shrink-0"
+                          >
+                            <div
+                              className="border border-black"
+                              style={{
+                                width: "10px",
+                                height: "10px",
+                                backgroundColor: tag.color,
+                              }}
+                            />
+                            <span
+                              style={{
+                                fontFamily:
+                                  "SF Mono, Menlo, Monaco, Consolas, monospace",
+                                fontSize: "11px",
+                              }}
+                            >
+                              {tag.name}
+                            </span>
+                          </button>
+                        ));
+                  })()
+                )}
               </div>
 
               {/* Add Tag Button - Fixed Right */}
               <button
                 ref={tagButtonRef}
                 onClick={() => setIsTagCustomizerOpen(!isTagCustomizerOpen)}
-                className="border border-black px-3 py-1.5 bg-white hover:bg-black hover:text-white transition-colors shrink-0"
+                className="border border-black w-8 h-8 bg-white hover:bg-black hover:text-white transition-colors shrink-0 flex items-center justify-center"
               >
                 <span
                   style={{
                     fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
                     fontSize: "12px",
+                    lineHeight: "1",
                   }}
                 >
                   +
@@ -272,14 +490,36 @@ export function ArchiveModal({
             </div>
           </div>
 
-          {/* Tag Customizer Popover */}
-          <TagCustomizer
+          {/* Tag Creator Popover */}
+          <TagCreator
             isOpen={isTagCustomizerOpen}
             onClose={() => setIsTagCustomizerOpen(false)}
             anchorEl={tagButtonRef.current}
-            onSelectTag={(shape, color) =>
-              setSelectedTag({ name: shape, color })
-            }
+            onCreateTag={(name, color) => {
+              const newTag: NodeTag = { name, color };
+
+              // 새 태그를 선택된 태그에 추가
+              setSelectedTags((prev) => {
+                const exists = prev.some(
+                  (tag) => tag.name === name && tag.color === color
+                );
+                if (exists) {
+                  return prev;
+                }
+                return [...prev, newTag];
+              });
+
+              // recentTags 목록에 추가
+              setRecentTags((prev) => {
+                const exists = prev.some(
+                  (tag) => tag.name === name && tag.color === color
+                );
+                if (exists) {
+                  return prev;
+                }
+                return [newTag, ...prev];
+              });
+            }}
           />
 
           {/* Two Column Layout */}
@@ -303,13 +543,29 @@ export function ArchiveModal({
                   <div className="flex gap-1 mb-2">
                     <select
                       value={selectedYear}
-                      onChange={(e) => setSelectedYear(Number(e.target.value))}
-                      className="flex-1 border border-black bg-white px-1 py-1 outline-none"
+                      onChange={(e) => {
+                        const newYear = Number(e.target.value);
+                        setSelectedYear(newYear);
+                        // 연도 변경 시 선택된 일이 유효한지 확인
+                        const daysInNewMonth = new Date(
+                          newYear,
+                          selectedMonth + 1,
+                          0
+                        ).getDate();
+                        if (
+                          selectedDay !== null &&
+                          selectedDay > daysInNewMonth
+                        ) {
+                          setSelectedDay(daysInNewMonth);
+                        }
+                      }}
+                      className="flex-1 border border-black bg-white px-1 py-0.5 outline-none "
                       style={{
                         fontFamily:
                           "SF Mono, Menlo, Monaco, Consolas, monospace",
                         fontSize: "11px",
                       }}
+                      size={1}
                     >
                       {years.map((year) => (
                         <option key={year} value={year}>
@@ -319,13 +575,29 @@ export function ArchiveModal({
                     </select>
                     <select
                       value={selectedMonth}
-                      onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                      className="flex-1 border border-black bg-white px-1 py-1 outline-none"
+                      onChange={(e) => {
+                        const newMonth = Number(e.target.value);
+                        setSelectedMonth(newMonth);
+                        // 월 변경 시 선택된 일이 유효한지 확인
+                        const daysInNewMonth = new Date(
+                          selectedYear,
+                          newMonth + 1,
+                          0
+                        ).getDate();
+                        if (
+                          selectedDay !== null &&
+                          selectedDay > daysInNewMonth
+                        ) {
+                          setSelectedDay(daysInNewMonth);
+                        }
+                      }}
+                      className="flex-1 border border-black bg-white px-1 py-0.5 outline-none"
                       style={{
                         fontFamily:
                           "SF Mono, Menlo, Monaco, Consolas, monospace",
                         fontSize: "11px",
                       }}
+                      size={1}
                     >
                       {months.map((month, index) => (
                         <option key={month} value={index}>
@@ -395,14 +667,51 @@ export function ArchiveModal({
                 >
                   이미지
                 </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="hidden"
+                />
                 <button
-                  className="w-full h-48 bg-white hover:bg-[#F2F0EB] transition-colors flex items-center justify-center"
+                  onClick={handleImageButtonClick}
+                  className="w-full h-48 bg-white hover:bg-[#F2F0EB] transition-colors flex items-center justify-center relative overflow-hidden"
                   style={{
                     border: "1px solid rgba(0,0,0,0.3)",
                     cursor: "pointer",
                   }}
                 >
-                  <Plus size={40} strokeWidth={1} style={{ opacity: 0.2 }} />
+                  {selectedImage ? (
+                    <>
+                      <img
+                        src={selectedImage}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        onClick={handleRemoveImage}
+                        className="absolute top-2 right-2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white rounded-full p-1 transition-colors"
+                        style={{
+                          backdropFilter: "blur(4px)",
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Remove image"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleRemoveImage(e);
+                          }
+                        }}
+                      >
+                        <X size={16} strokeWidth={2} />
+                      </button>
+                    </>
+                  ) : (
+                    <Plus size={40} strokeWidth={1} style={{ opacity: 0.2 }} />
+                  )}
                 </button>
               </div>
             </div>
@@ -477,54 +786,30 @@ export function ArchiveModal({
 
               {/* Description - OPTIONAL */}
               <div className="flex-1">
-                <div
-                  style={{
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
-                    fontSize: "11px",
-                    marginBottom: "8px",
-                    opacity: 0.4,
-                    color: "#666",
-                  }}
-                >
-                  내용
+                <div className="flex items-center mb-2">
+                  <div
+                    style={{
+                      fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                      fontSize: "11px",
+                      opacity: 0.4,
+                      color: "#666",
+                    }}
+                  >
+                    내용
+                  </div>
                 </div>
                 <div
-                  className="bg-white p-3 relative"
+                  className="bg-white p-3 relative overflow-auto"
                   style={{
                     border: "1px solid rgba(0,0,0,0.3)",
                     height: "342px",
                   }}
                 >
-                  {/* Skeleton Hint */}
-                  {!description && (
-                    <div className="absolute inset-0 p-3 space-y-2 pointer-events-none select-none opacity-20">
-                      <div
-                        style={{
-                          fontFamily:
-                            'Georgia, "Times New Roman", Times, serif',
-                          fontSize: "16px",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        제목을 입력하세요
-                      </div>
-                      <div
-                        style={{
-                          fontFamily:
-                            "SF Mono, Menlo, Monaco, Consolas, monospace",
-                          fontSize: "12px",
-                          lineHeight: "1.5",
-                        }}
-                      >
-                        엔터를 누르면 본문을 작성할 수 있습니다...
-                      </div>
-                    </div>
-                  )}
                   <textarea
-                    placeholder=""
+                    placeholder="내용을 입력해주세요"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="w-full h-full bg-transparent outline-none resize-none relative z-10"
+                    className="w-full h-full bg-transparent outline-none resize-none"
                     style={{
                       fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
                       fontSize: "12px",
@@ -536,20 +821,40 @@ export function ArchiveModal({
             </div>
           </div>
 
+          {/* 에러 메시지 표시 */}
+          {errorMessage && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-300 rounded">
+              <span
+                style={{
+                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontSize: "12px",
+                  color: "#D32F2F",
+                }}
+              >
+                {errorMessage}
+              </span>
+            </div>
+          )}
+
           {/* Bottom: Save Button (and Delete for existing nodes) */}
           <div className="flex gap-2">
             <button
               onClick={handleSave}
+              disabled={isSaving}
               className={`text-[#F2F0EB] py-2.5 border border-black transition-colors ${
                 currentNodeData ? "flex-1" : "w-full"
-              }`}
+              } ${isSaving ? "opacity-50 cursor-not-allowed" : ""}`}
               style={{ backgroundColor: "#8B857D" }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = "#3A3834")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "#8B857D")
-              }
+              onMouseEnter={(e) => {
+                if (!isSaving) {
+                  e.currentTarget.style.backgroundColor = "#3A3834";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isSaving) {
+                  e.currentTarget.style.backgroundColor = "#8B857D";
+                }
+              }}
             >
               <span
                 style={{
@@ -558,7 +863,7 @@ export function ArchiveModal({
                   letterSpacing: "0.05em",
                 }}
               >
-                저장
+                {isSaving ? "저장 중..." : "저장"}
               </span>
             </button>
 
