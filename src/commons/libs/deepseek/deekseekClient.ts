@@ -7,7 +7,7 @@ export const callDeepseek = async (
 ): Promise<unknown> => {
   try {
     const response = await fetch(
-      "https://1ouj3zep02.execute-api.ap-northeast-2.amazonaws.com/dev/similarity-return",
+      "https://4iy42lphh8.execute-api.ap-northeast-2.amazonaws.com/dev/deepseek/embedding",
       {
         method: "POST",
         headers: {

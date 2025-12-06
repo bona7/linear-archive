@@ -16,6 +16,7 @@ import {
   Error,
 } from "./testCrud.style";
 import LLMSearchBar from "../llmSearchBar/llmSearchBar.index";
+import AnalysisCall from "../AnalysisCall/AnalysisCall.index";
 
 export default function TestCrud() {
   const [description, setDescription] = useState("");
@@ -162,6 +163,9 @@ export default function TestCrud() {
     <Container>
       <h1>CRUD 테스트</h1>
       <p>사용자: {user.email}</p>
+
+      {/* Analysis Call Component - runs once on mount */}
+      <AnalysisCall />
 
       {/* LLM Search Bar Component */}
       <LLMSearchBar />
