@@ -8,7 +8,7 @@ interface TagCreatorProps {
   onCreateTag: (name: string, color: string) => void;
 }
 
-// 태그 생성 모달 & db.ts생성 후 커밋
+// 태그 생성 모달을 비롯한 다른 변경사항 main에 푸시하기 위한 생성
 
 export function TagCreator({
   isOpen,
