@@ -7,6 +7,7 @@ export interface Board {
   user_id: string;
   description: string | null;
   date: string | null;
+  time: string | null;
 }
 
 export interface Tag {
@@ -29,6 +30,7 @@ export interface BoardWithTags extends Board {
 export interface CreateBoardParams {
   description?: string;
   date?: string;
+  time?: string;
   tags: Array<{
     tag_name: string;
     tag_color: string;
@@ -87,6 +89,7 @@ export async function createBoard(params: CreateBoardParams) {
           user_id: userId,
           description: params.description || null,
           date: params.date || null,
+          time: params.time || null,
         },
       ])
       .select()
@@ -237,6 +240,7 @@ export async function readBoardsWithTags(): Promise<BoardWithTags[]> {
       user_id: board.user_id,
       description: board.description,
       date: board.date,
+      time: board.time,
       tags: tags,
     };
   });
@@ -323,6 +327,7 @@ export async function readBoardById(
     user_id: data.user_id,
     description: data.description,
     date: data.date,
+    time: data.time,
     tags: tags,
   };
 
@@ -371,6 +376,7 @@ export async function updateBoard(
   updates: {
     description?: string;
     date?: string;
+    time?: string;
     tags?: Array<{ tag_name: string; tag_color: string }>;
     image?: File;
   }
@@ -387,6 +393,7 @@ export async function updateBoard(
   if (updates.description !== undefined)
     boardUpdates.description = updates.description;
   if (updates.date !== undefined) boardUpdates.date = updates.date;
+  if (updates.time !== undefined) boardUpdates.time = updates.time;
 
   if (Object.keys(boardUpdates).length > 0) {
     const { error: boardError } = await supabase
