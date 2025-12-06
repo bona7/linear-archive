@@ -1,35 +1,64 @@
-import { useState, useRef, useEffect, forwardRef, useImperativeHandle, useMemo } from "react";
-
-interface NodeTag {
-  name: string;
-  color: string;
-}
-
-interface NodeData {
-  id: string;
-  tag?: NodeTag;
-  title?: string;
-  description?: string;
-  date?: Date;
-}
+import {
+  useState,
+  useRef,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+  useMemo,
+} from "react";
+import { BoardWithTags } from "@/commons/libs/supabase/db";
 
 interface TimelineProps {
-  onNodeClick: (nodeId: string, position: { x: number; y: number }) => void;
-  selectedNodeId: string | null;
-  nodeDataMap: Record<string, NodeData>;
+  onNodeClick: (
+    nodeId: number | string,
+    position: { x: number; y: number }
+  ) => void;
+  selectedNodeId: number | string | null;
+  nodeDataMap: BoardWithTags[]; // This is the array of nodes
   searchQuery: string;
-  matchedNodeIds: Set<string>;
+  matchedNodeIds: Set<number | string>;
 }
 
-export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, TimelineProps>(
-  ({ onNodeClick, selectedNodeId, nodeDataMap, searchQuery, matchedNodeIds }, ref) => {
+export const Timeline = forwardRef<
+  { scrollToDate: (date: Date) => void },
+  TimelineProps
+>(
+  (
+    { onNodeClick, selectedNodeId, nodeDataMap, searchQuery, matchedNodeIds },
+    ref
+  ) => {
     const [scrollPosition, setScrollPosition] = useState(0);
     const [zoom, setZoom] = useState(1);
-    const [hoveredCluster, setHoveredCluster] = useState<number | string | null>(null);
-    const [hoveredNodeId, setHoveredNodeId] = useState<number | string | null>(null);
-    const [hoveredNodePosition, setHoveredNodePosition] = useState<{ x: number; y: number } | null>(null);
+    const [hoveredCluster, setHoveredCluster] = useState<
+      number | string | null
+    >(null);
+    const [hoveredNodeId, setHoveredNodeId] = useState<number | string | null>(
+      null
+    );
+    const [hoveredNodePosition, setHoveredNodePosition] = useState<{
+      x: number;
+      y: number;
+    } | null>(null);
     const timelineRef = useRef<HTMLDivElement>(null);
-    const pendingZoomAdjustment = useRef<{ mouseX: number; previousZoom: number } | null>(null);
+    const pendingZoomAdjustment = useRef<{
+      mouseX: number;
+      previousZoom: number;
+    } | null>(null);
+
+    const nodesById = useMemo(() => {
+      if (!Array.isArray(nodeDataMap)) return new Map();
+      return new Map(nodeDataMap.map((node) => [node.board_id, node]));
+    }, [nodeDataMap]);
+
+//     // Convert date to position percentage
+//     const dateToPosition = (date: Date) => {
+//       const startDate = new Date(2024, 9, 1); // Oct 2024
+//       const endDate = new Date(2025, 11, 31); // Dec 2025
+//       const totalDays =
+//         (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+//       const daysSinceStart =
+//         (date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+
     // [추가] 1. 데이터에 따라 시작일(가장 오래된 날짜)과 종료일(오늘) 자동 계산
     const { startDate, endDate } = useMemo(() => {
       const today = new Date();
@@ -37,7 +66,7 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
       today.setHours(23, 59, 59, 999);
 
       // 데이터 노드들에서 날짜만 뽑아내기
-      const nodes = Object.values(nodeDataMap);
+      const nodes = Object.values(nodesById);
       const dates = nodes
         .map(node => node.date)
         .filter((date): date is Date => date !== undefined);
@@ -78,23 +107,6 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
       return Math.max(1, Math.min(100, calculatedMax));
     }, [totalDays]);
 
-    // Data nodes with different geometric shapes and positions
-    // Extended data across longer timeline
-    const dataNodes = [
-      { id: 1, type: 'circle', position: 5, label: 'Project Alpha' },
-      { id: 2, type: 'square', position: 12, label: 'Release 1.0' },
-      { id: 3, type: 'circle', position: 18, label: 'Milestone' },
-      { id: 4, type: 'square', position: 25, label: 'Update 2.0' },
-      { id: 5, type: 'circle', position: 35, label: 'Phase 3' },
-      { id: 6, type: 'square', position: 42, label: 'Beta Launch' },
-      { id: 7, type: 'circle', position: 50, label: 'Version 3.0' },
-      { id: 8, type: 'square', position: 58, label: 'Expansion' },
-      { id: 9, type: 'circle', position: 67, label: 'Update 4.0' },
-      { id: 10, type: 'square', position: 75, label: 'Phase 5' },
-      { id: 11, type: 'circle', position: 82, label: 'Milestone 6' },
-      { id: 12, type: 'square', position: 90, label: 'Final Release' },
-    ];
-
     // Convert date to position percentage
     const dateToPosition = (date: Date) => {
       // [수정] 고정 날짜 삭제하고 계산된 변수 사용
@@ -104,19 +116,19 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
     };
 
     // Combine default nodes with dynamic nodes from nodeDataMap
-    const allNodes = [
-      ...dataNodes,
-      ...Object.values(nodeDataMap)
-        .filter(node => node.date && !dataNodes.find(n => n.id === node.id))
-        .map(node => ({
-          id: node.id,
-          type: node.tag?.name || 'circle',
-          position: dateToPosition(node.date!),
-          label: node.title || 'New Archive',
-        }))
-    ];
+    const allNodes = (Array.isArray(nodeDataMap) ? nodeDataMap : [])
+      .filter((node) => node.date)
+      .map((node) => ({
+        id: node.board_id,
+        type: node.tags[0]?.tag_name || "circle",
+        position: dateToPosition(new Date(node.date)),
+        label: node.description || "New Archive",
+      }));
 
-    const handleNodeClick = (event: React.MouseEvent, node: { id: number; position: number }) => {
+    const handleNodeClick = (
+      event: React.MouseEvent,
+      node: { id: string; position: number }
+    ) => {
       const rect = event.currentTarget.getBoundingClientRect();
       onNodeClick(node.id, {
         x: rect.left + rect.width / 2,
@@ -289,7 +301,7 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
           clusters.push({
             id: clusterId++,
             centerPosition: centerPos,
-            nodes: [...currentCluster]
+            nodes: [...currentCluster],
           });
         }
       });
@@ -312,19 +324,19 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
 
       return {
         x: Math.cos(angle) * radius,
-        y: Math.sin(angle) * radius
+        y: Math.sin(angle) * radius,
       };
     };
 
     // Get cluster index and position within cluster for a node
-    const getNodeClusterInfo = (nodeId: number) => {
+    const getNodeClusterInfo = (nodeId: number | string) => {
       for (const cluster of clusters) {
-        const nodeIndex = cluster.nodes.findIndex(n => n.id === nodeId);
+        const nodeIndex = cluster.nodes.findIndex((n) => n.id === nodeId);
         if (nodeIndex !== -1) {
           return {
             cluster,
             indexInCluster: nodeIndex,
-            totalInCluster: cluster.nodes.length
+            totalInCluster: cluster.nodes.length,
           };
         }
       }
@@ -438,14 +450,20 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
     };
 
     useImperativeHandle(ref, () => ({
-      scrollToDate
+      scrollToDate,
     }));
 
     return (
       <div className="relative w-full px-16 py-16 pb-24">
         {/* Scroll Indicators - Dynamic Dates */}
         <div className="absolute left-16 top-8">
-          <span className="block border border-black bg-[#F2F0EB] px-3 py-2" style={{ fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace', fontSize: '16px' }}>
+          <span
+            className="block border border-black bg-[#F2F0EB] px-3 py-2"
+            style={{
+              fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+              fontSize: "16px",
+            }}
+          >
             {visibleRange.left}
           </span>
         </div>
@@ -453,12 +471,25 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
         {/* Horizontal Scroll Hint - Center */}
         <div className="absolute top-8 left-1/2 transform -translate-x-1/2 flex items-center gap-2">
           <div className="w-8 h-0.5 bg-black" />
-          <span style={{ fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace', fontSize: '11px' }}>SCROLL</span>
+          <span
+            style={{
+              fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+              fontSize: "11px",
+            }}
+          >
+            SCROLL
+          </span>
           <div className="w-8 h-0.5 bg-black" />
         </div>
 
         <div className="absolute right-16 top-8">
-          <span className="block border border-black bg-[#F2F0EB] px-3 py-2" style={{ fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace', fontSize: '16px' }}>
+          <span
+            className="block border border-black bg-[#F2F0EB] px-3 py-2"
+            style={{
+              fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+              fontSize: "16px",
+            }}
+          >
             {visibleRange.right}
           </span>
         </div>
@@ -567,8 +598,9 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
 
             {/* Data Nodes */}
             {allNodes.map((node) => {
-              const nodeData = nodeDataMap[node.id];
-              const nodeTag = nodeData?.tag;
+              const nodeData = nodesById.get(node.id);
+              if (!nodeData) return null;
+              const nodeTag = nodeData.tags;
 
               // Search filtering
               const isSearching = searchQuery.trim().length > 0;
@@ -579,10 +611,16 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
               // Get cluster info for this node
               const clusterInfo = getNodeClusterInfo(node.id);
               const offset = clusterInfo
-                ? getNodeOffset(clusterInfo.totalInCluster, clusterInfo.indexInCluster, hoveredCluster === clusterInfo.cluster.id)
+                ? getNodeOffset(
+                    clusterInfo.totalInCluster,
+                    clusterInfo.indexInCluster,
+                    hoveredCluster === clusterInfo.cluster.id
+                  )
                 : { x: 0, y: 0 };
 
-              const displayPosition = clusterInfo ? clusterInfo.cluster.centerPosition : node.position;
+              const displayPosition = clusterInfo
+                ? clusterInfo.cluster.centerPosition
+                : node.position;
               const isSelected = selectedNodeId === node.id;
 
               return (
@@ -591,10 +629,10 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
                   className="absolute cursor-pointer z-10"
                   style={{
                     left: `${displayPosition}%`,
-                    top: '50%',
+                    top: "50%",
                     transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))`,
                     opacity: shouldDim ? 0.2 : 1,
-                    transition: 'all 0.3s ease',
+                    transition: "all 0.3s ease",
                   }}
                   onClick={(e) => handleNodeClick(e, node)}
                   onMouseEnter={(e) => {
@@ -605,7 +643,7 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
                     setHoveredNodeId(node.id);
                     setHoveredNodePosition({
                       x: rect.left + rect.width / 2,
-                      y: rect.top + rect.height / 2 // Center Y position
+                      y: rect.top + rect.height / 2, // Center Y position
                     });
                   }}
                   onMouseLeave={() => {
@@ -614,15 +652,22 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
                     setHoveredNodePosition(null);
                   }}
                 >
-                  {/* Node Shape - Always Circle, styled by tag color */}
+                  {/* Node Shape - styled by tag color */}
                   <div
                     className="w-4 h-4 transition-all"
                     style={{
-                      borderRadius: '50%',
-                      backgroundColor: nodeTag?.color || '#F2F0EB',
-                      border: shouldHighlight ? '3px solid black' : isSelected ? '3px solid black' : '2px solid black',
-                      boxShadow: isSelected ? '0 0 0 3px rgba(0, 0, 0, 0.3)' : 'none',
-                      transform: hoveredNodeId === node.id ? 'scale(2.5)' : 'scale(1)',
+                      borderRadius: "50%",
+                      backgroundColor: nodeTag[0]?.tag_color || "#F2F0EB",
+                      border: shouldHighlight
+                        ? "3px solid black"
+                        : isSelected
+                        ? "3px solid black"
+                        : "2px solid black",
+                      boxShadow: isSelected
+                        ? "0 0 0 3px rgba(0, 0, 0, 0.3)"
+                        : "none",
+                      transform:
+                        hoveredNodeId === node.id ? "scale(2.5)" : "scale(1)",
                     }}
                   />
                 </div>
@@ -632,106 +677,103 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
         </div>
 
         {/* Hover Tooltip - Fixed at bottom, outside timeline container */}
-        {hoveredNodeId !== null && hoveredNodePosition && (() => {
-          const nodeData = nodeDataMap[hoveredNodeId];
-          const nodeTag = nodeData?.tag;
+        {hoveredNodeId !== null &&
+          hoveredNodePosition &&
+          (() => {
+            const nodeData = nodesById.get(hoveredNodeId);
+            if (!nodeData) return null;
 
-          // Node radius when hovered (w-4 = 16px, scale 2.5 = 40px, radius = 20px)
-          const nodeRadius = 20;
-          const lineStartY = hoveredNodePosition.y + nodeRadius;
-          const lineHeight = `calc(100vh - ${lineStartY}px - 140px)`;
+            const nodeTag = nodeData.tags[0];
+            const nodeDate = new Date(nodeData.date);
 
-          return (
-            <>
-              {/* Connection line from node to tooltip - Animated */}
-              <div
-                className="fixed bg-black pointer-events-none animate-fadeIn"
-                style={{
-                  left: `${hoveredNodePosition.x}px`,
-                  top: `${lineStartY}px`,
-                  width: '2px',
-                  height: lineHeight,
-                  zIndex: 999,
-                }}
-              />
+            // Node radius when hovered (w-4 = 16px, scale 2.5 = 40px, radius = 20px)
+            const nodeRadius = 20;
+            const lineStartY = hoveredNodePosition.y + nodeRadius;
+            const lineHeight = `calc(100vh - ${lineStartY}px - 140px)`;
 
-              {/* Tooltip Box at bottom - Animated */}
-              <div
-                className="fixed border border-black bg-[#F2F0EB] px-3 py-2 pointer-events-none animate-fadeIn"
-                style={{
-                  left: `${hoveredNodePosition.x}px`,
-                  bottom: '80px',
-                  transform: 'translateX(-50%)',
-                  fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace',
-                  fontSize: '12px',
-                  zIndex: 1000,
-                  minWidth: '200px',
-                  maxWidth: '250px',
-                }}
-              >
-                {/* Date */}
-                {nodeData?.date && (
-                  <div className="mb-1">
-                    <span style={{ fontWeight: 'bold' }}>
-                      {nodeData.date.getFullYear()}/{String(nodeData.date.getMonth() + 1).padStart(2, '0')}/{String(nodeData.date.getDate()).padStart(2, '0')}
-                    </span>
-                    {/* Time if hours/minutes are set */}
-                    {(nodeData.date.getHours() !== 0 || nodeData.date.getMinutes() !== 0) && (
-                      <span>
-                        {' '}{String(nodeData.date.getHours()).padStart(2, '0')}:{String(nodeData.date.getMinutes()).padStart(2, '0')}
+            return (
+              <>
+                {/* Connection line from node to tooltip - Animated */}
+                <div
+                  className="fixed bg-black pointer-events-none animate-fadeIn"
+                  style={{
+                    left: `${hoveredNodePosition.x}px`,
+                    top: `${lineStartY}px`,
+                    width: "2px",
+                    height: lineHeight,
+                    zIndex: 999,
+                  }}
+                />
+
+                {/* Tooltip Box at bottom - Animated */}
+                <div
+                  className="fixed border border-black bg-[#F2F0EB] px-3 py-2 pointer-events-none animate-fadeIn"
+                  style={{
+                    left: `${hoveredNodePosition.x}px`,
+                    bottom: "80px",
+                    transform: "translateX(-50%)",
+                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    fontSize: "12px",
+                    zIndex: 1000,
+                    minWidth: "200px",
+                    maxWidth: "250px",
+                  }}
+                >
+                  {/* Date */}
+                  {nodeData.date && (
+                    <div className="mb-1">
+                      <span style={{ fontWeight: "bold" }}>
+                        {nodeDate.getFullYear()}/
+                        {String(nodeDate.getMonth() + 1).padStart(2, "0")}/
+                        {String(nodeDate.getDate()).padStart(2, "0")}
                       </span>
-                    )}
-                  </div>
-                )}
+                      {/* Time if hours/minutes are set */}
+                      {(nodeDate.getHours() !== 0 ||
+                        nodeDate.getMinutes() !== 0) && (
+                        <span>
+                          {" "}
+                          {String(nodeDate.getHours()).padStart(2, "0")}:
+                          {String(nodeDate.getMinutes()).padStart(2, "0")}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
-                {/* Tag */}
-                {nodeTag && (
-                  <div className="mb-1 flex items-center gap-1">
+                  {/* Tag */}
+                  {nodeTag && (
+                    <div className="mb-1 flex items-center gap-1">
+                      <div
+                        style={{
+                          width: "8px",
+                          height: "8px",
+                          borderRadius: "50%",
+                          backgroundColor: nodeTag.tag_color,
+                          border: "1px solid black",
+                        }}
+                      />
+                      <span>{nodeTag.tag_name}</span>
+                    </div>
+                  )}
+
+                  {/* Description */}
+                  {nodeData.description && (
                     <div
+                      className="mt-1 pt-1"
                       style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        backgroundColor: nodeTag.color,
-                        border: '1px solid black',
+                        borderTop: "1px solid black",
+                        lineHeight: "1.4",
                       }}
-                    />
-                    <span>{nodeTag.name}</span>
-                  </div>
-                )}
-
-                {/* Description */}
-                {nodeData?.description && (
-                  <div
-                    className="mt-1 pt-1"
-                    style={{
-                      borderTop: '1px solid black',
-                      lineHeight: '1.4',
-                    }}
-                  >
-                    {nodeData.description.length > 60
-                      ? `${nodeData.description.substring(0, 60)}...`
-                      : nodeData.description
-                    }
-                  </div>
-                )}
-
-                {/* Title if no description */}
-                {!nodeData?.description && nodeData?.title && (
-                  <div
-                    className="mt-1 pt-1"
-                    style={{
-                      borderTop: '1px solid black',
-                      lineHeight: '1.4',
-                    }}
-                  >
-                    {nodeData.title}
-                  </div>
-                )}
-              </div>
-            </>
-          );
-        })()}
+                    >
+                      {nodeData.description.length > 60
+                        ? `${nodeData.description.substring(0, 60)}...`
+                        : nodeData.description}
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
       </div>
     );
-  });
+  }
+);
