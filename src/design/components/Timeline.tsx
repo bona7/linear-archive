@@ -425,7 +425,6 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
 
             {/* Extended Tick Marks */}
             {Array.from({ length: 97 }).map((_, i) => {
-              const isLargeTick = i % 5 === 0;
               return (
                 <div
                   key={`tick-${i}`}
@@ -433,8 +432,8 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
                   style={{
                     left: `${(i / 96) * 100}%`,
                     width: '1px',
-                    height: isLargeTick ? '24px' : '12px',
-                    top: isLargeTick ? '-12px' : '-6px',
+                    height: '12px',
+                    top: '-6px',
                   }}
                 />
               );
