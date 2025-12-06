@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle, useMemo } from "react";
 
 interface NodeTag {
   name: string;
@@ -30,6 +30,38 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
     const [hoveredNodePosition, setHoveredNodePosition] = useState<{ x: number; y: number } | null>(null);
     const timelineRef = useRef<HTMLDivElement>(null);
     const pendingZoomAdjustment = useRef<{ mouseX: number; previousZoom: number } | null>(null);
+    // [추가] 1. 데이터에 따라 시작일(가장 오래된 날짜)과 종료일(오늘) 자동 계산
+    const { startDate, endDate } = useMemo(() => {
+      const today = new Date();
+      // 오늘 날짜의 끝(23시 59분)까지 포함
+      today.setHours(23, 59, 59, 999);
+
+      // 데이터 노드들에서 날짜만 뽑아내기
+      const nodes = Object.values(nodeDataMap);
+      const dates = nodes
+        .map(node => node.date)
+        .filter((date): date is Date => date !== undefined);
+
+      // 하드코딩된 예시 데이터(dataNodes)의 날짜는 없다고 가정하고, 
+      // 실제 데이터가 없으면 '오늘로부터 3개월 전'을 기본값으로 씀
+      if (dates.length === 0) {
+        const defaultStart = new Date(today);
+        defaultStart.setMonth(today.getMonth() - 3);
+        return { startDate: defaultStart, endDate: today };
+      }
+
+      // 가장 오래된 날짜 찾기
+      const oldestDate = new Date(Math.min(...dates.map(d => d.getTime())));
+
+      // [디자인 팁] 가장 오래된 날짜보다 7일 정도 여유를 둬서 왼쪽 벽에 딱 붙지 않게 함
+      const adjustedStart = new Date(oldestDate);
+      adjustedStart.setDate(adjustedStart.getDate() - 7);
+
+      return { startDate: adjustedStart, endDate: today };
+    }, [nodeDataMap]);
+
+    // [추가] 2. 전체 기간(일수) 계산 - 이걸 기준으로 비율을 나눕니다
+    const totalDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
 
     // Data nodes with different geometric shapes and positions
     // Extended data across longer timeline
@@ -50,11 +82,9 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
 
     // Convert date to position percentage
     const dateToPosition = (date: Date) => {
-      const startDate = new Date(2024, 9, 1); // Oct 2024
-      const endDate = new Date(2025, 11, 31); // Dec 2025
-      const totalDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+      // [수정] 고정 날짜 삭제하고 계산된 변수 사용
       const daysSinceStart = (date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-
+      // 전체 기간 대비 며칠이나 지났는지 백분율 계산
       return Math.max(0, Math.min(100, (daysSinceStart / totalDays) * 100));
     };
 
@@ -165,33 +195,39 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
 
     // Calculate date range based on scroll position
     const getDateFromPosition = (position: number) => {
-      const startDate = new Date(2024, 9, 1); // Oct 2024
-      const totalMonths = 14;
-      const monthsOffset = (position / 100) * totalMonths;
+      // [수정] 고정 날짜 삭제
+      const daysOffset = (position / 100) * totalDays;
 
       const resultDate = new Date(startDate);
-      resultDate.setMonth(resultDate.getMonth() + monthsOffset);
+      resultDate.setDate(resultDate.getDate() + daysOffset);
 
-      // [수정] YYYY/MM 형태로 변경 (예: 2025/08)
+      // YYYY/MM 형태로 변경 (예: 2025/01)
       const year = resultDate.getFullYear();
-      const month = resultDate.getMonth() + 1;
+      const month = String(resultDate.getMonth() + 1).padStart(2, '0');
       return `${year}/${month}`;
     };
 
     // Calculate visible range (left and right edges of viewport)
     const getVisibleRange = () => {
-      if (!timelineRef.current) return { left: 'OCT 2024', right: 'DEC 2024' };
+      // 아직 타임라인이 준비되지 않았을 때는 시작일~종료일 표시 (안전장치)
+      if (!timelineRef.current) {
+        return { 
+          left: getDateFromPosition(0), 
+          right: getDateFromPosition(100) 
+        };
+      }
 
-      const clientWidth = timelineRef.current.clientWidth;
+      const scrollLeft = timelineRef.current.scrollLeft;
       const scrollWidth = timelineRef.current.scrollWidth;
-      const viewportPercentage = (clientWidth / scrollWidth) * 100;
+      const clientWidth = timelineRef.current.clientWidth;
 
-      const leftPosition = scrollPosition;
-      const rightPosition = Math.min(scrollPosition + viewportPercentage, 100);
+      // 수정: '스크롤바 위치'가 아니라 '전체 길이 대비 현재 위치'를 직접 계산하게 함
+      const startPercentage = (scrollLeft / scrollWidth) * 100;
+      const endPercentage = ((scrollLeft + clientWidth) / scrollWidth) * 100;
 
       return {
-        left: getDateFromPosition(leftPosition),
-        right: getDateFromPosition(rightPosition)
+        left: getDateFromPosition(startPercentage),
+        right: getDateFromPosition(endPercentage)
       };
     };
 
@@ -284,14 +320,19 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
       return null;
     };
 
-    // Calculate month markers (Oct 2024 - Dec 2025)
+    // Calculate month markers
     const getMonthMarkers = () => {
-      const startDate = new Date(2024, 9, 1); // Oct 2024
-      const endDate = new Date(2025, 11, 31); // Dec 2025
-      const totalDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-
       const markers = [];
-      let currentDate = new Date(2024, 9, 1); // Start at Oct 2024
+      // [수정] 시작 날짜를 기준으로 루프 시작
+      let currentDate = new Date(startDate);
+
+      // 날짜를 1일로 맞춤 (월별 마커를 정확히 찍기 위해)
+      currentDate.setDate(1);
+
+      // 만약 시작일이 10월 15일이면, 10월 1일은 과거니까 11월 1일부터 마커를 찍기 시작
+      if (currentDate < startDate) {
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      }
 
       while (currentDate <= endDate) {
         const daysSinceStart = (currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
@@ -300,11 +341,14 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
         const monthName = `${currentDate.getMonth() + 1}월`;
         const year = currentDate.getFullYear();
 
-        markers.push({
-          position,
-          label: `${year}년 ${monthName}`,
-          monthOnly: monthName,
-        });
+        // 범위(0~100%) 안에 있을 때만 표시
+        if (position >= 0 && position <= 100) {
+          markers.push({
+            position,
+            label: `${year}년 ${monthName}`,
+            monthOnly: monthName,
+          });
+        }
 
         // Move to next month
         currentDate.setMonth(currentDate.getMonth() + 1);
@@ -317,11 +361,8 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
 
     // Calculate date labels for tick marks (every 7 days)
     const getDateLabels = () => {
-      const startDate = new Date(2024, 9, 1); // Oct 2024
-      const endDate = new Date(2025, 11, 31); // Dec 2025
-      const totalDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-
       const labels = [];
+      // [수정] 시작 날짜 기준
       let currentDate = new Date(startDate);
 
       while (currentDate <= endDate) {
@@ -344,11 +385,10 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
 
     // Function to scroll to a specific date
     const scrollToDate = (date: Date) => {
-      const startDate = new Date(2024, 9, 1); // Oct 2024
-      const totalMonths = 14;
-      const monthsOffset = (date.getFullYear() - startDate.getFullYear()) * 12 + (date.getMonth() - startDate.getMonth());
+      // [수정] 전체 기간 대비 비율 계산
+      const daysSinceStart = (date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+      const scrollPercentage = (daysSinceStart / totalDays) * 100;
 
-      const scrollPercentage = (monthsOffset / totalMonths) * 100;
       if (timelineRef.current) {
         const maxScroll = timelineRef.current.scrollWidth - timelineRef.current.clientWidth;
         timelineRef.current.scrollLeft = (scrollPercentage / 100) * maxScroll;
