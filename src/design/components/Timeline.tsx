@@ -46,7 +46,7 @@ export const Timeline = forwardRef<
     } | null>(null);
 
     const nodesById = useMemo(() => {
-      if (!nodeDataMap) return new Map();
+      if (!Array.isArray(nodeDataMap)) return new Map();
       return new Map(nodeDataMap.map((node) => [node.board_id, node]));
     }, [nodeDataMap]);
 
@@ -63,7 +63,7 @@ export const Timeline = forwardRef<
     };
 
     // Combine default nodes with dynamic nodes from nodeDataMap
-    const allNodes = nodeDataMap
+    const allNodes = (Array.isArray(nodeDataMap) ? nodeDataMap : [])
       .filter((node) => node.date)
       .map((node) => ({
         id: node.board_id,
