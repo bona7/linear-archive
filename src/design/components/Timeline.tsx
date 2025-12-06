@@ -482,14 +482,15 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
                     left: `${marker.position}%`,
                     top: '-50%',
                     transform: 'translateY(-50%)',
+                    // zIndex: marker.isYear ? 2 : 1, // 년도가 월보다 위에 오게. optional
                   }}
                 >
-                  {/* Vertical line for month boundary */}
+                  {/* 세로선: 년도 vs 월 구분 */}
                   <div
                     className="bg-black"
                     style={{
-                      width: '2px',
-                      height: '40px',
+                      width: marker.isYear ? '2px' : '1px',
+                      height: marker.isYear ? '40px' : '24px',
                       position: 'absolute',
                       bottom: '0',
                       left: '0',
@@ -500,10 +501,10 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
                     className="absolute"
                     style={{
                       left: '6px',
-                      bottom: '32px',
+                      bottom: marker.isYear ? '32px' : '16px',
                       fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace',
-                      fontSize: '14px',
-                      fontWeight: 'bold',
+                      fontSize: marker.isYear ? '14px' : '12px',
+                      fontWeight: marker.isYear ? 'bold' : 'normal',
                       whiteSpace: 'nowrap',
                     }}
                   >
