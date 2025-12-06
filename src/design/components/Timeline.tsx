@@ -164,7 +164,6 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
     }, []);
 
     // Calculate date range based on scroll position
-    // Timeline spans from Oct 2024 to Dec 2025 (14 months)
     const getDateFromPosition = (position: number) => {
       const startDate = new Date(2024, 9, 1); // Oct 2024
       const totalMonths = 14;
@@ -173,7 +172,10 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
       const resultDate = new Date(startDate);
       resultDate.setMonth(resultDate.getMonth() + monthsOffset);
 
-      return resultDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase();
+      // [수정] YYYY/MM 형태로 변경 (예: 2025/08)
+      const year = resultDate.getFullYear();
+      const month = resultDate.getMonth() + 1;
+      return `${year}/${month}`;
     };
 
     // Calculate visible range (left and right edges of viewport)
@@ -295,12 +297,12 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
         const daysSinceStart = (currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
         const position = (daysSinceStart / totalDays) * 100;
 
-        const monthName = currentDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+        const monthName = `${currentDate.getMonth() + 1}월`;
         const year = currentDate.getFullYear();
 
         markers.push({
           position,
-          label: `${monthName} ${year}`,
+          label: `${year}년 ${monthName}`,
           monthOnly: monthName,
         });
 
@@ -383,7 +385,7 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
         <div
           ref={timelineRef}
           className="relative w-full h-48 overflow-x-auto overflow-y-hidden timeline-container"
-          // onWheel={handleWheel}
+        // onWheel={handleWheel}
         >
           {/* Extended Timeline Content - Dynamic width based on zoom */}
           <div className="relative h-full" style={{ width: `${400 * zoom}%`, minWidth: `${400 * zoom}%` }}>
