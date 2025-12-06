@@ -59,9 +59,24 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
 
       return { startDate: adjustedStart, endDate: today };
     }, [nodeDataMap]);
+    // 현재 줌 레벨에서 화면에 보이는 총 일수 계산
+    const getVisibleDays = () => {
+      return totalDays / zoom;
+    };
 
     // [추가] 2. 전체 기간(일수) 계산 - 이걸 기준으로 비율을 나눕니다
     const totalDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+
+    // [추가] 데이터 기간에 맞춘 반응형 최대 줌 배율 계산
+    const maxZoom = useMemo(() => {
+      // 데이터가 너무 적을 때(예: 10일)를 대비해 최소 1배는 보장
+      // 데이터가 많으면(예: 10년), 10일 단위까지 확대할 수 있도록 배율을 높임
+      // 공식: 전체 기간 / 10일 (화면에 최소 10일은 보이게 제한)
+      const calculatedMax = totalDays / 10;
+
+      // 너무 과하거나 적지 않게 안전장치 (최소 1배 ~ 최대 100배)
+      return Math.max(1, Math.min(100, calculatedMax));
+    }, [totalDays]);
 
     // Data nodes with different geometric shapes and positions
     // Extended data across longer timeline
@@ -147,7 +162,7 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
       const onWheel = (e: WheelEvent) => {
         // Ctrl(또는 Command) 키를 누른 상태에서만 줌 동작하도록 설정
         if (e.ctrlKey || e.metaKey) {
-          e.preventDefault(); // 🚨 핵심: 브라우저 전체 페이지 확대 방지
+          e.preventDefault(); // 브라우저 전체 페이지 확대 방지
           e.stopPropagation();
 
           // 마우스 위치 계산
@@ -158,18 +173,14 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
           const delta = -e.deltaY * 0.001;
 
           setZoom(prev => {
-            // 최소 스케일을 0.25로 변경 (400% 너비를 한 화면에 보려면 0.25배 필요)
-            // 최대 스케일은 5배
-            const newZoom = Math.max(0.25, Math.min(5, prev + delta));
+            const newZoom = Math.max(0.25, Math.min(maxZoom, prev + delta)); // 👈 maxZoom 적용
 
-            // 줌 변경 후 마우스 포인터 위치 유지를 위한 계산 값 저장
             pendingZoomAdjustment.current = {
               mouseX,
               previousZoom: prev
             };
-
             return newZoom;
-          });
+          }); // }, [maxZoom]);
         }
       };
 
@@ -211,9 +222,9 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
     const getVisibleRange = () => {
       // 아직 타임라인이 준비되지 않았을 때는 시작일~종료일 표시 (안전장치)
       if (!timelineRef.current) {
-        return { 
-          left: getDateFromPosition(0), 
-          right: getDateFromPosition(100) 
+        return {
+          left: getDateFromPosition(0),
+          right: getDateFromPosition(100)
         };
       }
 
@@ -320,64 +331,95 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
       return null;
     };
 
-    // Calculate month markers
+    // [수정] 월/년 마커: 1개월 -> 3개월 -> 6개월 -> 1년 순으로 자연스럽게 축소
     const getMonthMarkers = () => {
       const markers = [];
-      // [수정] 시작 날짜를 기준으로 루프 시작
       let currentDate = new Date(startDate);
-
-      // 날짜를 1일로 맞춤 (월별 마커를 정확히 찍기 위해)
-      currentDate.setDate(1);
-
-      // 만약 시작일이 10월 15일이면, 10월 1일은 과거니까 11월 1일부터 마커를 찍기 시작
+      currentDate.setDate(1); 
+      
       if (currentDate < startDate) {
         currentDate.setMonth(currentDate.getMonth() + 1);
       }
+
+      const visibleDays = getVisibleDays();
+      
+      // [조건] 화면에 5년치(1800일) 이상이 한 번에 보일 때만 분기(3개월)로 줄임
+      // 즉, 지금 데이터(약 1.5년) 수준에서는 웬만하면 항상 '매월' 표시됨
+      let monthStep = 1;
+      if (visibleDays > 1800) monthStep = 3; 
 
       while (currentDate <= endDate) {
         const daysSinceStart = (currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
         const position = (daysSinceStart / totalDays) * 100;
 
-        const monthName = `${currentDate.getMonth() + 1}월`;
+        const month = currentDate.getMonth() + 1;
         const year = currentDate.getFullYear();
+        const isJanuary = month === 1;
+        
+        const shouldShowMonth = (month - 1) % monthStep === 0;
 
-        // 범위(0~100%) 안에 있을 때만 표시
         if (position >= 0 && position <= 100) {
-          markers.push({
-            position,
-            label: `${year}년 ${monthName}`,
-            monthOnly: monthName,
-          });
+          if (shouldShowMonth) {
+            markers.push({
+              position,
+              label: isJanuary ? `${year}년` : `${month}월`,
+              monthOnly: isJanuary ? `${year}년` : `${month}월`,
+              isYear: isJanuary
+            });
+          }
         }
-
-        // Move to next month
         currentDate.setMonth(currentDate.getMonth() + 1);
       }
-
       return markers;
     };
 
     const monthMarkers = getMonthMarkers();
 
-    // Calculate date labels for tick marks (every 7 days)
+    // [수정] 날짜 채우기: 3일, 2일, 1일 간격이 훨씬 빨리(저배율에서) 나타나도록 설정
     const getDateLabels = () => {
+      const visibleDays = getVisibleDays();
       const labels = [];
-      // [수정] 시작 날짜 기준
+      
+      // [조건] 화면에 약 2.5년(900일) 이상 보이면 날짜 숨김
+      // (이때는 위의 getMonthMarkers에 의해 '매월'은 표시되고 있음 -> 역전 해결)
+      if (visibleDays > 900) return [];
+
+      // [간격 결정] 숫자가 높을수록 더 넓은 화면에서 해당 간격이 나타남
+      let step = 1;
+      
+      // 1. [10일 간격]: ~900일 (약 2.5년) 보일 때
+      if (visibleDays > 450) step = 10;
+      
+      // 2. [7일 간격]: ~450일 (약 1.2년) 보일 때 (요청하신 대로 적당한 유지)
+      else if (visibleDays > 250) step = 7;
+      
+      // 3. [3일 간격]: 🚨 ~250일 (약 8개월) 보이면 바로 진입! (기존보다 훨씬 빨라짐)
+      else if (visibleDays > 150) step = 3;
+      
+      // 4. [2일 간격]: 🚨 ~150일 (약 5개월) 보이면 바로 진입!
+      else if (visibleDays > 100) step = 2;
+      
+      // 5. [1일 간격]: ~100일 (약 3개월) 이하로 보이면 바로 매일 표시
+      else step = 1;      
+      
       let currentDate = new Date(startDate);
 
       while (currentDate <= endDate) {
         const daysSinceStart = (currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
         const position = (daysSinceStart / totalDays) * 100;
+        const day = currentDate.getDate();
 
-        labels.push({
-          position,
-          day: currentDate.getDate(),
-        });
-
-        // Move to next week (7 days)
-        currentDate.setDate(currentDate.getDate() + 7);
+        if (position >= 0 && position <= 100) {
+          labels.push({
+            position,
+            day,
+            type: step === 1 ? 'daily' : 'sparse',
+            showLabel: true 
+          });
+        }
+        
+        currentDate.setDate(currentDate.getDate() + step);
       }
-
       return labels;
     };
 
@@ -470,37 +512,39 @@ export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, Timel
                 </div>
               ))}
 
-              {/* Extended Tick Marks */}
-              {Array.from({ length: 97 }).map((_, i) => {
-                return (
+              {/* [수정] 줌 레벨에 따라 동적으로 변하는 눈금과 날짜 */}
+              {dateLabels.map((label, index) => (
+                <div key={`date-tick-${index}`}>
+                  {/* 세로선 (Tick): type에 따라 길이 조절 */}
                   <div
-                    key={`tick-${i}`}
                     className="absolute bg-black"
                     style={{
-                      left: `${(i / 96) * 100}%`,
+                      left: `${label.position}%`,
                       width: '1px',
-                      height: '12px',
+                      // daily는 짧게(8px), weekly는 조금 길게(12px)
+                      height: label.type === 'daily' ? '8px' : '12px',
                       top: '-6px',
                     }}
                   />
-                );
-              })}
 
-              {/* Date Labels - Every 7 days */}
-              {dateLabels.map((label, index) => (
-                <span
-                  key={`date-label-${index}`}
-                  className="absolute"
-                  style={{
-                    left: `${label.position}%`,
-                    top: '-20px',
-                    transform: 'translateX(-50%)',
-                    fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace',
-                    fontSize: '13px',
-                  }}
-                >
-                  {label.day}
-                </span>
+                  {/* 날짜 글씨: showLabel이 true일 때만 표시 */}
+                  {label.showLabel && (
+                    <span
+                      className="absolute"
+                      style={{
+                        left: `${label.position}%`,
+                        top: '-20px',
+                        transform: 'translateX(-50%)',
+                        fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace',
+                        fontSize: '11px',
+                        color: label.day === 1 ? 'black' : '#666', // 1일은 진하게
+                        fontWeight: label.day === 1 ? 'bold' : 'normal',
+                      }}
+                    >
+                      {label.day}
+                    </span>
+                  )}
+                </div>
               ))}
             </div>
 
