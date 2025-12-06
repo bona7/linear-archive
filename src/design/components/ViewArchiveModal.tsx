@@ -54,6 +54,19 @@ export function ViewArchiveModal({
         const data = await readBoardById(currentNodeData.id);
 
         if (data) {
+          // 콘솔에 데이터 출력
+          console.log("=== 노드 클릭 데이터 ===");
+          console.log("Node ID:", currentNodeData.id);
+          console.log("Board Data:", {
+            date: data.date,
+            time: data.time,
+            description: data.description,
+            tags: data.tags,
+            image_url: data.image_url,
+          });
+          console.log("Full Data:", data);
+          console.log("======================");
+
           // 태그 배열로 변환
           const tags: NodeTag[] = data.tags.map((tag) => ({
             name: tag.tag_name,
@@ -67,6 +80,8 @@ export function ViewArchiveModal({
             time: data.time,
             imageUrl: data.image_url || null,
           });
+        } else {
+          console.log("데이터를 찾을 수 없습니다:", currentNodeData.id);
         }
       } catch (error) {
         console.error("Failed to load board data:", error);
@@ -99,23 +114,35 @@ export function ViewArchiveModal({
   };
 
   // date와 time을 합쳐서 Date 객체 생성
-  const displayDate =
-    boardData?.date && boardData?.time
-      ? (() => {
-          const dateParts = boardData.date.split("-");
-          const timeParts = boardData.time.split(":");
-          if (dateParts.length === 3 && timeParts.length >= 2) {
-            return new Date(
-              Number(dateParts[0]),
-              Number(dateParts[1]) - 1,
-              Number(dateParts[2]),
-              Number(timeParts[0]),
-              Number(timeParts[1])
-            );
+  const displayDate = boardData?.date
+    ? (() => {
+        const dateParts = boardData.date.split("-");
+        if (dateParts.length === 3) {
+          // time이 있으면 함께 사용, 없으면 시간은 0으로 설정
+          if (boardData.time) {
+            const timeParts = boardData.time.split(":");
+            if (timeParts.length >= 2) {
+              return new Date(
+                Number(dateParts[0]),
+                Number(dateParts[1]) - 1,
+                Number(dateParts[2]),
+                Number(timeParts[0]),
+                Number(timeParts[1])
+              );
+            }
           }
-          return null;
-        })()
-      : null;
+          // time이 없으면 날짜만 사용 (시간은 0:00)
+          return new Date(
+            Number(dateParts[0]),
+            Number(dateParts[1]) - 1,
+            Number(dateParts[2]),
+            0,
+            0
+          );
+        }
+        return null;
+      })()
+    : null;
 
   const handleDelete = async () => {
     if (!currentNodeData?.id) return;
@@ -309,7 +336,7 @@ export function ViewArchiveModal({
               </div>
 
               {/* Image Display - 읽기 전용 */}
-              <div>
+              <div className="flex-1">
                 <div
                   style={{
                     fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
@@ -322,16 +349,21 @@ export function ViewArchiveModal({
                   이미지
                 </div>
                 <div
-                  className="w-full h-48 bg-white flex items-center justify-center relative overflow-hidden"
+                  className="w-full bg-white flex items-center justify-center relative"
                   style={{
                     border: "1px solid rgba(0,0,0,0.3)",
+                    height: "342px", // 내용 div와 동일한 높이
                   }}
                 >
                   {boardData?.imageUrl ? (
                     <img
                       src={boardData.imageUrl}
                       alt="Archive"
-                      className="w-full h-full object-cover"
+                      className="w-full h-auto"
+                      style={{
+                        maxHeight: "342px", // description div의 높이와 동일
+                        objectFit: "contain",
+                      }}
                     />
                   ) : (
                     <span
@@ -377,7 +409,7 @@ export function ViewArchiveModal({
               </div>
 
               {/* Description Display - 읽기 전용 */}
-              <div className="flex-1">
+              <div className="flex-1 flex flex-col">
                 <div
                   style={{
                     fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
@@ -390,7 +422,7 @@ export function ViewArchiveModal({
                   내용
                 </div>
                 <div
-                  className="bg-white p-3 relative"
+                  className="bg-white relative flex-1"
                   style={{
                     border: "1px solid rgba(0,0,0,0.3)",
                     height: "342px",
@@ -399,7 +431,7 @@ export function ViewArchiveModal({
                 >
                   {boardData?.description ? (
                     <div
-                      className="w-full h-full overflow-auto"
+                      className="w-full h-full overflow-auto p-3"
                       style={{
                         fontFamily:
                           "SF Mono, Menlo, Monaco, Consolas, monospace",
@@ -412,7 +444,7 @@ export function ViewArchiveModal({
                     </div>
                   ) : (
                     <div
-                      className="text-gray-400"
+                      className="text-gray-400 p-3"
                       style={{
                         fontFamily:
                           "SF Mono, Menlo, Monaco, Consolas, monospace",
