@@ -4,7 +4,7 @@ import { ArchiveModal } from "./components/ArchiveModal";
 import { SearchBar } from "./components/SearchBar";
 import { LoginModal } from "./components/LoginModal";
 import { ProfileMenu } from "./components/ProfileMenu";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import nodeItems from "./data/nodeItems";
 
 interface NodeTag {
@@ -190,7 +190,7 @@ export default function App() {
   return (
     <>
       {/* Login Modal */}
-      <LoginModal isOpen={!isLoggedIn} onLogin={handleLogin} />
+      {/* <LoginModal isOpen={user} onLogin={handleLogin} /> */}
 
       {/* Header - Always visible and clear */}
       <header className="fixed top-0 left-0 right-0 pt-8 pb-8 pointer-events-none z-[100]">
