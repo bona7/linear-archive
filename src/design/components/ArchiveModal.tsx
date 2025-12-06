@@ -770,10 +770,11 @@ export function ArchiveModal({
                     />
                     <button
                       onClick={handleImageButtonClick}
-                      className="w-full h-48 bg-white hover:bg-[#F2F0EB] transition-colors flex items-center justify-center relative overflow-hidden"
+                      className="w-full bg-white hover:bg-[#F2F0EB] transition-colors flex items-center justify-center relative"
                       style={{
                         border: "1px solid rgba(0,0,0,0.3)",
                         cursor: "pointer",
+                        minHeight: "192px", // 기본 최소 높이
                       }}
                     >
                       {selectedImage ? (
@@ -781,7 +782,11 @@ export function ArchiveModal({
                           <img
                             src={selectedImage}
                             alt="Preview"
-                            className="w-full h-full object-cover"
+                            className="w-full h-auto"
+                            style={{
+                              maxHeight: "342px", // 내용 영역의 높이와 동일
+                              objectFit: "contain",
+                            }}
                           />
                           <button
                             onClick={handleRemoveImage}
