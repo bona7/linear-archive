@@ -6,7 +6,8 @@ import "../styles/globals.css";
 import Head from "next/head";
 import { Router, useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import Script from "next/script"; // ✅ 추가
+// import Script from "next/script"; // ✅ 추가
+import "@blocknote/react/style.css";
 
 import TokenInitializer from "../src/commons/libraries/TokenInitializer";
 import {
@@ -14,7 +15,8 @@ import {
   LoadingOverlay,
 } from "../src/commons/libraries/loadingOverlay";
 
-const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "";
+import "@uiw/react-md-editor/markdown-editor.css";
+import "@uiw/react-markdown-preview/markdown.css";
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();

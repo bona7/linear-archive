@@ -10,6 +10,7 @@ const withPWA = require("next-pwa")({
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
+const webpack = require("webpack");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
