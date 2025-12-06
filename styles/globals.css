@@ -60,3 +60,25 @@ a {
 .animate-fadeIn {
   animation: fadeIn 0.2s ease-out;
 }
+
+/* BlockNote 커스터마이징 */
+.blocknote-editor-custom {
+  font-family: "SF Mono, Menlo, Monaco, Consolas, monospace" !important;
+  font-size: 12px !important;
+}
+
+.blocknote-editor-custom .bn-container {
+  padding: 12px;
+  height: 100%;
+}
+
+.blocknote-editor-custom .bn-editor {
+  font-family: "SF Mono, Menlo, Monaco, Consolas, monospace" !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+/* BlockNote 블록 스타일 조정 */
+.blocknote-editor-custom .bn-block-content {
+  font-family: "SF Mono, Menlo, Monaco, Consolas, monospace" !important;
+}

@@ -6,7 +6,7 @@ interface NodeTag {
 }
 
 interface NodeData {
-  id: number;
+  id: string;
   tag?: NodeTag;
   title?: string;
   description?: string;
@@ -14,19 +14,19 @@ interface NodeData {
 }
 
 interface TimelineProps {
-  onNodeClick: (nodeId: number, position: { x: number; y: number }) => void;
-  selectedNodeId: number | null;
-  nodeDataMap: Record<number, NodeData>;
+  onNodeClick: (nodeId: string, position: { x: number; y: number }) => void;
+  selectedNodeId: string | null;
+  nodeDataMap: Record<string, NodeData>;
   searchQuery: string;
-  matchedNodeIds: Set<number>;
+  matchedNodeIds: Set<string>;
 }
 
 export const Timeline = forwardRef<{ scrollToDate: (date: Date) => void }, TimelineProps>(
   ({ onNodeClick, selectedNodeId, nodeDataMap, searchQuery, matchedNodeIds }, ref) => {
     const [scrollPosition, setScrollPosition] = useState(0);
     const [zoom, setZoom] = useState(1);
-    const [hoveredCluster, setHoveredCluster] = useState<number | null>(null);
-    const [hoveredNodeId, setHoveredNodeId] = useState<number | null>(null);
+    const [hoveredCluster, setHoveredCluster] = useState<number | string | null>(null);
+    const [hoveredNodeId, setHoveredNodeId] = useState<number | string | null>(null);
     const [hoveredNodePosition, setHoveredNodePosition] = useState<{ x: number; y: number } | null>(null);
     const timelineRef = useRef<HTMLDivElement>(null);
     const pendingZoomAdjustment = useRef<{ mouseX: number; previousZoom: number } | null>(null);
