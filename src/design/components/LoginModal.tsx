@@ -11,7 +11,7 @@ import {
 
 interface LoginModalProps {
   isOpen: boolean;
-  onLogin: (nickname: string) => void;
+  onLogin: () => void;
 }
 
 type SignUpStep = "email" | "nickname" | "success";
@@ -67,10 +67,8 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
           password: loginPassword,
         });
 
-        // 로그인 성공 시 닉네임 가져오기
-        const displayName = await getDisplayName();
-        const nickname = displayName || loginEmail.split("@")[0];
-        onLogin(nickname);
+        // 로그인 성공 시 onLogin 호출 (nickname은 부모에서 다시 불러옴)
+        onLogin();
       } catch (error: any) {
         console.error("Login failed:", error);
         setErrorMessage(error.message || "로그인에 실패했습니다.");
@@ -122,7 +120,7 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
   };
 
   const handleFinalLogin = () => {
-    onLogin(nickname);
+    onLogin(); // onLogin 호출 (부모에서 다시 불러옴)
   };
 
   const handleToggleMode = () => {

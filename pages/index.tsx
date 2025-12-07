@@ -51,20 +51,22 @@ export default function App() {
     };
   }
 
+  const checkUser = async () => {
+    try {
+      const currentUser = await getUser();
+      setUser(currentUser);
+      const name = await getDisplayName();
+      setDisplayNameValue(name);
+    } catch (err) {
+      setUser(null);
+      setDisplayNameValue(null);
+    }
+  };
+  checkUser();
+
   const timelineRef = useRef<{ scrollToDate: (date: Date) => void }>(null);
 
   useEffect(() => {
-    const checkUser = async () => {
-      try {
-        const currentUser = await getUser();
-        setUser(currentUser);
-        const name = await getDisplayName();
-        setDisplayNameValue(name);
-      } catch (err) {
-        setUser(null);
-        setDisplayNameValue(null);
-      }
-    };
     checkUser();
   }, []);
 
@@ -84,7 +86,9 @@ export default function App() {
     loadBoards();
   }, [user]);
 
-  const handleLogin = (nickname: string) => {};
+  const handleLogin = () => {
+    checkUser();
+  };
 
   const handleLogout = async () => {
     try {
@@ -302,13 +306,6 @@ export default function App() {
             selectedNodeId !== null
               ? boardToNodeData(nodeDataMap[selectedNodeId])
               : undefined;
-
-          if (currentViewNodeData) {
-            console.log(
-              "Data passed to ViewArchiveModal:",
-              currentViewNodeData
-            );
-          }
 
           return (
             <ViewArchiveModal
