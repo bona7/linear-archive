@@ -17,6 +17,12 @@ export interface SignInParams {
  * displayName은 user_metadata에 저장됨
  */
 export async function signUp({ email, password, displayName }: SignUpParams) {
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (typeof window !== "undefined"
+      ? window.location.origin
+      : "http://localhost:3000");
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -24,9 +30,7 @@ export async function signUp({ email, password, displayName }: SignUpParams) {
       data: {
         display_name: displayName,
       },
-      emailRedirectTo: `${
-        process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-      }`, // 이메일 인증 후 리다이렉트할 URL
+      emailRedirectTo: `${siteUrl}?signup_step=success`, // 이메일 인증 후 성공 단계로 리다이렉트
     },
   });
 
@@ -112,6 +116,12 @@ export async function getDisplayName(): Promise<string | null> {
  * displayName 업데이트
  */
 export async function updateDisplayName(displayName: string) {
+  // 세션 확인
+  const session = await getSession();
+  if (!session?.user) {
+    throw new Error("Auth session missing! 이메일 인증을 완료해주세요.");
+  }
+
   const { data, error } = await supabase.auth.updateUser({
     data: {
       display_name: displayName,

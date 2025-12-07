@@ -2,21 +2,23 @@ import { useState, useEffect } from "react";
 import svgPaths from "src/design/imports/svg-jicd7esovz";
 import supabase_logo from "public/assets/supabase_logo.png";
 
-import {
-  signIn,
-  signUp,
-  updateDisplayName,
-  getDisplayName,
-} from "../../commons/libs/supabase/auth";
+import { signIn, signUp } from "../../commons/libs/supabase/auth";
 
 interface LoginModalProps {
   isOpen: boolean;
   onLogin: () => void;
+  initialStep?: "email" | "check_email" | "success" | null;
+  onSignUpModeChange?: (isSignUpMode: boolean) => void;
 }
 
-type SignUpStep = "email" | "nickname" | "success";
+type SignUpStep = "email" | "check_email" | "success";
 
-export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
+export function LoginModal({
+  isOpen,
+  onLogin,
+  initialStep,
+  onSignUpModeChange,
+}: LoginModalProps) {
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [signUpStep, setSignUpStep] = useState<SignUpStep>("email");
 
@@ -33,11 +35,22 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // isSignUpMode가 변경될 때마다 부모에게 알림
+  useEffect(() => {
+    onSignUpModeChange?.(isSignUpMode);
+  }, [isSignUpMode, onSignUpModeChange]);
+
   // Reset to initial login state when modal opens
   useEffect(() => {
     if (isOpen) {
-      setIsSignUpMode(false);
-      setSignUpStep("email");
+      // initialStep이 있으면 해당 단계로 설정
+      if (initialStep) {
+        setIsSignUpMode(true);
+        setSignUpStep(initialStep);
+      } else {
+        setIsSignUpMode(false);
+        setSignUpStep("email");
+      }
       //setEmailVerified(false);
       setLoginEmail("");
       setLoginPassword("");
@@ -47,7 +60,7 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
       setNickname("");
       setErrorMessage(null);
     }
-  }, [isOpen]);
+  }, [isOpen, initialStep]);
 
   if (!isOpen) return null;
 
@@ -80,43 +93,29 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
 
   const handleSignUpEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (signUpEmail.trim() && signUpPassword.trim() && passwordsMatch) {
+    if (
+      signUpEmail.trim() &&
+      signUpPassword.trim() &&
+      passwordsMatch &&
+      nickname.trim()
+    ) {
       setIsLoading(true);
       setErrorMessage(null);
       try {
-        // 이메일 인증 코드 전송을 위해 signUp 호출
+        // 이메일 인증 코드 전송을 위해 signUp 호출 (닉네임 포함)
         await signUp({
           email: signUpEmail,
           password: signUpPassword,
-          displayName: "", // 닉네임은 아직 설정하지 않음
+          displayName: nickname, // 닉네임 포함
         });
-        // 회원가입 성공 시 다음 단계로
-        setSignUpStep("nickname");
+        // 이메일 확인 단계로 이동
+        setSignUpStep("check_email");
       } catch (error: any) {
         console.error("Sign up failed:", error);
         setErrorMessage(error.message || "회원가입에 실패했습니다.");
       } finally {
         setIsLoading(false);
       }
-    }
-  };
-
-  const handleNicknameSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nickname.trim()) return;
-
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    try {
-      // 이미 회원가입은 완료되었으므로 닉네임만 업데이트
-      await updateDisplayName(nickname);
-      setSignUpStep("success");
-    } catch (error: any) {
-      console.error("Failed to update display name:", error);
-      setErrorMessage(error.message || "닉네임 설정에 실패했습니다.");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -145,7 +144,7 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
   // Sign Up Step 1: Email & Password
   if (isSignUpMode && signUpStep === "email") {
     return (
-      <div className="fixed inset-0 z-50 flex items-start justify-center pt-48 px-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
         {/* Backdrop */}
         <div className="absolute inset-0 bg-[#F2F0EB]/70 backdrop-blur-sm" />
 
@@ -156,7 +155,7 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
         >
           {/* Title */}
           <div className="mb-8">
-            <div className="text-center mb-6">
+            {/* <div className="text-center mb-6">
               <div
                 style={{
                   fontFamily: "Georgia, serif",
@@ -167,7 +166,7 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
                 <p style={{ margin: 0 }}>LINEAR</p>
                 <p style={{ margin: 0 }}>ARCHIVE</p>
               </div>
-            </div>
+            </div> */}
             <p
               className="text-center mb-6"
               style={{
@@ -306,11 +305,39 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
               )}
             </div>
 
+            {/* Nickname Field - 새로 추가 */}
+            <div>
+              <label
+                htmlFor="signUpNickname"
+                className="block mb-2"
+                style={{
+                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontSize: "12px",
+                  fontWeight: "bold",
+                }}
+              >
+                닉네임
+              </label>
+              <input
+                id="signUpNickname"
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                className="w-full border-2 border-black bg-[#F2F0EB] px-4 py-3 focus:outline-none focus:border-black"
+                style={{
+                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontSize: "14px",
+                }}
+                placeholder="화면에 표시할 닉네임을 입력하세요"
+                required
+              />
+            </div>
+
             {/* Buttons */}
             <div className="space-y-4">
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !nickname.trim()}
                 className="w-full border-2 border-black bg-black text-[#F2F0EB] px-6 py-3 hover:bg-[#F2F0EB] hover:text-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
@@ -357,10 +384,10 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
     );
   }
 
-  // Sign Up Step 2: Email Verification & Nickname
-  if (isSignUpMode && signUpStep === "nickname") {
+  // Sign Up Step 2: Check Email
+  if (isSignUpMode && signUpStep === "check_email") {
     return (
-      <div className="fixed inset-0 z-50 flex items-start justify-center pt-48 px-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
         {/* Backdrop */}
         <div className="absolute inset-0 bg-[#F2F0EB]/70 backdrop-blur-sm" />
 
@@ -386,35 +413,8 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
             <div className="w-full h-0.5 bg-black" />
           </div>
 
-          {/* Supabase Email Verification Message */}
+          {/* Check Email Message */}
           <div className="mb-8">
-            <div className="flex items-center justify-center gap-1 mb-2">
-              <img
-                alt="Supabase"
-                src={supabase_logo.src}
-                style={{ height: "35px", width: "auto" }}
-              />
-              <span
-                style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
-                  fontSize: "18px",
-                  fontWeight: "bold",
-                }}
-              >
-                로
-              </span>
-            </div>
-            <p
-              className="text-center"
-              style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
-                fontSize: "18px",
-                fontWeight: "bold",
-                lineHeight: "1.2",
-              }}
-            >
-              전송된 이메일에서
-            </p>
             <p
               className="text-center"
               style={{
@@ -424,73 +424,11 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
                 lineHeight: "1.6",
               }}
             >
-              '확인(Confirm your mail)'을
+              이메일 보관함에서
               <br />
-              눌러주세요.
+              Confirm your mail을 눌러주세요.
             </p>
           </div>
-
-          {/* Error Message */}
-          {errorMessage && (
-            <div className="mb-6 p-3 bg-red-50 border border-red-300 rounded">
-              <span
-                style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
-                  fontSize: "12px",
-                  color: "#D32F2F",
-                }}
-              >
-                {errorMessage}
-              </span>
-            </div>
-          )}
-
-          {/*email verification checkbox 삭제*/}
-
-          {/* Nickname Input */}
-          <form onSubmit={handleNicknameSubmit} className="space-y-6">
-            <div>
-              <label
-                htmlFor="nickname"
-                className="block mb-2"
-                style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
-                  fontSize: "12px",
-                  fontWeight: "bold",
-                }}
-              >
-                닉네임
-              </label>
-              <input
-                id="nickname"
-                type="text"
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                className="w-full border-2 border-black bg-[#F2F0EB] px-4 py-3 focus:outline-none focus:border-black"
-                style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
-                  fontSize: "14px",
-                }}
-                placeholder="화면에 표시할 닉네임을 입력하세요"
-                required
-              />
-            </div>
-
-            {/* Complete Button */}
-            <button
-              type="submit"
-              //disabled={!emailVerified || isLoading}
-              disabled={isLoading || !nickname.trim()}
-              className="w-full border-2 border-black bg-black text-[#F2F0EB] px-6 py-3 hover:bg-[#F2F0EB] hover:text-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
-                fontSize: "15px",
-                fontWeight: "bold",
-              }}
-            >
-              {isLoading ? "처리 중..." : "회원가입 완료"}
-            </button>
-          </form>
 
           {/* Decorative corners */}
           <div
@@ -517,7 +455,7 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
   // Sign Up Step 3: Success
   if (isSignUpMode && signUpStep === "success") {
     return (
-      <div className="fixed inset-0 z-50 flex items-start justify-center pt-48 px-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
         {/* Backdrop */}
         <div className="absolute inset-0 bg-[#F2F0EB]/70 backdrop-blur-sm" />
 
@@ -564,7 +502,8 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
                 fontWeight: "bold",
               }}
             >
-              로그인하여 LINEAR-ARCHIVE 서비스를 이용해보세요.
+              로그인하여 LINEAR-ARCHIVE <br />
+              서비스를 이용해보세요.
             </p>
           </div>
 

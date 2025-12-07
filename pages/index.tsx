@@ -56,6 +56,10 @@ export default function App() {
   const [selectedFilterTags, setSelectedFilterTags] = useState<NodeTag[]>([]);
   const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false); // AnalysisPanel 상태 추가
   const [isLoggingOut, setIsLoggingOut] = useState(false); // 로그아웃 로딩 상태 추가
+  const [initialSignUpStep, setInitialSignUpStep] = useState<
+    "email" | "check_email" | "success" | null
+  >(null); // 초기 회원가입 단계
+  const [isSignUpMode, setIsSignUpMode] = useState(false); // LoginModal 회원가입 모드 상태
 
   const nodeDataMap = useMemo(() => {
     return Object.fromEntries(boards.map((board) => [board.board_id, board]));
@@ -83,6 +87,16 @@ export default function App() {
         const displayName =
           (session.user.user_metadata?.display_name as string) || null;
 
+        // 이메일 인증 완료 후 success 단계로 이동 (닉네임은 이미 입력됨)
+        if (
+          session.user.email_confirmed_at &&
+          displayName &&
+          !initialSignUpStep &&
+          !user
+        ) {
+          setInitialSignUpStep("success");
+        }
+
         if (user?.id !== session.user.id || displayNameValue !== displayName) {
           setUser(session.user);
           setDisplayNameValue(displayName);
@@ -92,6 +106,7 @@ export default function App() {
         if (user !== null) {
           setUser(null);
           setDisplayNameValue(null);
+          setInitialSignUpStep(null); // 사용자가 없을 때 초기화
         }
       }
     } catch (err) {
@@ -99,6 +114,7 @@ export default function App() {
       if (user !== null) {
         setUser(null);
         setDisplayNameValue(null);
+        setInitialSignUpStep(null); // 에러 시에도 초기화
       }
     }
   };
@@ -151,6 +167,7 @@ export default function App() {
       await signOut();
       setUser(null);
       setDisplayNameValue(null);
+      setInitialSignUpStep(null); // 회원가입 단계 초기화
     } catch (err: any) {
       console.error(err.message || "로그아웃 실패");
     } finally {
@@ -311,10 +328,35 @@ export default function App() {
     console.log("검색/필터링 매칭 노드:", matchedNodeIds);
   }, [matchedNodeIds]);
 
+  // URL 쿼리 파라미터 확인
+  useEffect(() => {
+    const { signup_step } = router.query;
+
+    // 새 창에서 열린 경우 부모 창으로 리다이렉트
+    if (window.opener && signup_step === "success") {
+      const currentUrl = window.location.href;
+      window.opener.location.href = currentUrl;
+      window.close();
+      return;
+    }
+
+    // 이메일 인증 완료 후 success 단계로 이동
+    if (signup_step === "success") {
+      setInitialSignUpStep("success");
+      // 쿼리 파라미터 제거 (URL 정리)
+      router.replace("/", undefined, { shallow: true });
+    }
+  }, [router.query, router]);
+
   return (
     <>
       {/* Login Modal */}
-      <LoginModal isOpen={!user} onLogin={handleLogin} />
+      <LoginModal
+        isOpen={!user}
+        onLogin={handleLogin}
+        initialStep={initialSignUpStep}
+        onSignUpModeChange={setIsSignUpMode}
+      />
 
       {/* Logout Loading Overlay */}
       <FullScreenLoadingOverlay visible={isLoggingOut}>
@@ -353,18 +395,20 @@ export default function App() {
           </div>
         )}
 
-        {/* Linear Archive Title - Moves down when logged in */}
-        <h1
-          className="text-center tracking-tight transition-all duration-700 ease-out"
-          style={{
-            fontFamily: "Georgia, serif",
-            fontSize: "96px",
-            lineHeight: "1",
-            transform: user ? "translateY(0)" : "translateY(40px)",
-          }}
-        >
-          Linear Archive
-        </h1>
+        {/* Linear Archive Title - 회원가입 모드일 때 숨김 */}
+        {!isSignUpMode && (
+          <h1
+            className="text-center tracking-tight transition-all duration-700 ease-out"
+            style={{
+              fontFamily: "Georgia, serif",
+              fontSize: "96px",
+              lineHeight: "1",
+              transform: user ? "translateY(0)" : "translateY(40px)",
+            }}
+          >
+            Linear Archive
+          </h1>
+        )}
 
         {/* Toolbar - Below Title - Only shown when logged in */}
         {user && (
