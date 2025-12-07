@@ -15,6 +15,7 @@ import {
   deleteBoard, // Assuming deleteBoard exists in db.ts and takes boardId: string
 } from "@/commons/libs/supabase/db";
 import { Router, useRouter } from "next/router";
+import { match } from "assert";
 
 export default function App() {
   const router = useRouter();
@@ -32,6 +33,8 @@ export default function App() {
   const [matchedNodeIds, setMatchedNodeIds] = useState<Set<string>>(new Set());
   const [user, setUser] = useState<any>(null);
   const [displayNameValue, setDisplayNameValue] = useState<string | null>(null);
+  const [tags, setTags] = useState<NodeTag[]>([]);
+  const [selectedFilterTags, setSelectedFilterTags] = useState<NodeTag[]>([]);
 
   const nodeDataMap = useMemo(() => {
     return Object.fromEntries(boards.map((board) => [board.board_id, board]));
@@ -84,6 +87,22 @@ export default function App() {
       }
     };
     loadBoards();
+    const loadTags = async () => {
+      if (!user) return;
+      try {
+        const tags = await getCurrentUserTags();
+        // Tag 타입을 NodeTag 타입으로 변환
+        const nodeTags: NodeTag[] = tags.map((tag) => ({
+          name: tag.tag_name,
+          color: tag.tag_color,
+        }));
+        setTags(nodeTags);
+      } catch (error) {
+        console.error("Failed to load tags:", error);
+        setTags([]);
+      }
+    };
+    loadTags();
   }, [user]);
 
   const handleLogin = () => {
@@ -179,7 +198,9 @@ export default function App() {
     const matches = new Set<string>();
     Object.values(nodeDataMap).forEach((node) => {
       // Search by tag name
-      const tagMatch = node.tags[0].tag_name.toLowerCase().includes(lowerQuery);
+      const tagMatch = node.tags?.[0]?.tag_name
+        .toLowerCase()
+        .includes(lowerQuery);
       const descMatch = node.description?.toLowerCase().includes(lowerQuery);
       if (tagMatch || descMatch) {
         matches.add(node.board_id);
@@ -197,6 +218,55 @@ export default function App() {
     setSearchQuery("");
     setMatchedNodeIds(new Set());
   };
+
+  const handleTagClick = (tag: NodeTag) => {
+    setSelectedFilterTags((prev) => {
+      // 이미 선택된 태그인지 확인
+      const isSelected = prev.some(
+        (t) => t.name === tag.name && t.color === tag.color
+      );
+
+      let newSelectedTags;
+      if (isSelected) {
+        // 이미 선택된 태그면 제거
+        newSelectedTags = prev.filter(
+          (t) => !(t.name === tag.name && t.color === tag.color)
+        );
+      } else {
+        // 선택되지 않은 태그면 추가
+        newSelectedTags = [...prev, tag];
+      }
+
+      // 필터링 업데이트
+      if (newSelectedTags.length === 0) {
+        setMatchedNodeIds(new Set());
+        setSearchQuery("");
+      } else {
+        const matches = new Set<string>();
+        Object.values(nodeDataMap).forEach((node) => {
+          // 선택된 태그 중 하나라도 가지고 있으면 매칭
+          const hasAnyTag = newSelectedTags.some((selectedTag) =>
+            node.tags.some(
+              (t) =>
+                t.tag_name === selectedTag.name &&
+                t.tag_color === selectedTag.color
+            )
+          );
+          if (hasAnyTag) {
+            matches.add(node.board_id);
+          }
+        });
+        setMatchedNodeIds(matches);
+        setSearchQuery("Tag fliter Activated");
+      }
+
+      return newSelectedTags;
+    });
+  };
+
+  useEffect(() => {
+    console.log("검색/필터링 매칭 노드:", matchedNodeIds);
+  }, [matchedNodeIds]);
 
   return (
     <>
@@ -280,6 +350,44 @@ export default function App() {
             />
           </div>
         )}
+
+        {/* Tags List - Below Search Bar */}
+        <div className="flex justify-center overflow-hidden p-8 space-x-8">
+          {tags.map((tag, index) => {
+            const isSelected = selectedFilterTags.some(
+              (t) => t.name === tag.name && t.color === tag.color
+            );
+
+            return (
+              <button
+                key={index}
+                onClick={() => handleTagClick(tag)}
+                className={`border px-2.5 py-1.5 flex items-center gap-1.5 transition-all shrink-0 ${
+                  isSelected
+                    ? "border-black bg-white opacity-100 shadow-sm"
+                    : "border-gray-300 bg-[#F2F0EB] opacity-60 hover:opacity-100"
+                }`}
+              >
+                <div
+                  className="border border-black"
+                  style={{
+                    width: "13px",
+                    height: "13px",
+                    backgroundColor: tag.color,
+                  }}
+                />
+                <span
+                  style={{
+                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    fontSize: "14px",
+                  }}
+                >
+                  {tag.name}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
         {/* Timeline Section - Center of Screen */}
         <div className="flex-1 flex items-center justify-center w-full">
