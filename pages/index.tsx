@@ -1,64 +1,88 @@
 import { Timeline } from "@/design/components/Timeline";
 import { Toolbar } from "@/design/components/Toolbar";
 import { ArchiveModal } from "@/design/components/ArchiveModal";
+import { ViewArchiveModal } from "@/design/components/ViewArchiveModal";
 import { SearchBar } from "@/design/components/SearchBar";
 import { LoginModal } from "@/design/components/LoginModal";
 import { ProfileMenu } from "@/design/components/ProfileMenu";
-import { useState, useRef, useEffect } from "react";
-import nodeItems from "@/design/data/nodeItems";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { NodeData, NodeTag } from "@/commons/types/types";
 import { signOut, getUser, getDisplayName } from "@/commons/libs/supabase/auth";
 import {
   BoardWithTags,
   readBoardsWithTags,
   getCurrentUserTags,
+  deleteBoard, // Assuming deleteBoard exists in db.ts and takes boardId: string
 } from "@/commons/libs/supabase/db";
 import { Router, useRouter } from "next/router";
 
 export default function App() {
   const router = useRouter();
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [modalPosition, setModalPosition] = useState<{
     x: number;
     y: number;
   } | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [boards, setBoards] = useState<BoardWithTags[]>([]);
-  const [nodeDataMap, setNodeDataMap] =
-    useState<Record<number, BoardWithTags>>(boards);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [matchedNodeIds, setMatchedNodeIds] = useState<Set<string>>(new Set());
   const [user, setUser] = useState<any>(null);
   const [displayNameValue, setDisplayNameValue] = useState<string | null>(null);
 
+  const nodeDataMap = useMemo(() => {
+    return Object.fromEntries(boards.map((board) => [board.board_id, board]));
+  }, [boards]);
+
+  function boardToNodeData(board: BoardWithTags): NodeData {
+    return {
+      id: board.board_id,
+      description: board.description ?? undefined,
+      tag:
+        board.tags.length > 0
+          ? { name: board.tags[0].tag_name, color: board.tags[0].tag_color }
+          : undefined,
+      date: board.date
+        ? new Date(`${board.date}T${board.time ?? "00:00:00"}`)
+        : undefined,
+    };
+  }
+
   const timelineRef = useRef<{ scrollToDate: (date: Date) => void }>(null);
 
   useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const currentUser = await getUser();
+        setUser(currentUser);
+        const name = await getDisplayName();
+        setDisplayNameValue(name);
+      } catch (err) {
+        setUser(null);
+        setDisplayNameValue(null);
+      }
+    };
     checkUser();
-    loadBoards();
   }, []);
 
-  const checkUser = async () => {
-    try {
-      const currentUser = await getUser();
-      setUser(currentUser);
-      const name = await getDisplayName();
-      setDisplayNameValue(name);
-    } catch (err) {
-      setUser(null);
-      setDisplayNameValue(null);
+  useEffect(() => {
+    if (!user) {
+      setBoards([]); // 또는 아무것도 하지 않기
+      return;
     }
-  };
-
-  const loadBoards = async () => {
-    try {
-      const data = await readBoardsWithTags();
-      setBoards(data);
-    } catch (err: any) {
-      console.error(err.message || "게시글 로드 실패");
-    }
-  };
+    const loadBoards = async () => {
+      try {
+        const data = await readBoardsWithTags();
+        setBoards(data);
+      } catch (err: any) {
+        console.error(err.message || "게시글 로드 실패");
+      }
+    };
+    loadBoards();
+  }, [user]);
 
   const handleLogin = (nickname: string) => {};
 
@@ -73,92 +97,66 @@ export default function App() {
   };
 
   const handleNodeClick = (
-    nodeId: number,
+    nodeId: string,
     position: { x: number; y: number }
   ) => {
     setSelectedNodeId(nodeId);
     setModalPosition(position);
-    setIsModalOpen(true);
+    setIsViewModalOpen(true); // ViewArchiveModal 열기
   };
 
   const handleToolbarNewArchive = () => {
     setSelectedNodeId(null);
     setModalPosition(null);
-    setIsModalOpen(true);
+    setIsEditModalOpen(true); // ArchiveModal 열기 (새 아카이브 생성)
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
+  const handleCloseViewModal = () => {
+    setIsViewModalOpen(false);
     setSelectedNodeId(null);
   };
 
-  const handleSaveArchive = () =>
-    // tag: NodeTag | null,
-    // description: string,
-    // date: Date | null
-    {
-      // if (selectedNodeId !== null) {
-      //   // Update existing node data
-      //   setNodeDataMap((prev) => ({
-      //     ...prev,
-      //     [selectedNodeId]: {
-      //       id: selectedNodeId,
-      //       tag: tag || prev[selectedNodeId]?.tag,
-      //       description,
-      //       date: date || prev[selectedNodeId]?.date,
-      //     },
-      //   }));
-      //   if (tag) {
-      //     // Update recent tags (add to beginning, remove duplicates, limit to 5)
-      //     setRecentTags((prev) => {
-      //       const filtered = prev.filter(
-      //         (t) => !(t.name === tag.name && t.color === tag.color)
-      //       );
-      //       return [tag, ...filtered].slice(0, 5);
-      //     });
-      //   }
-      //   // Scroll to date if provided
-      //   if (date && timelineRef.current) {
-      //     timelineRef.current.scrollToDate(date);
-      //   }
-      // } else if (tag && date) {
-      //   // Create new node
-      //   const newId = nextNodeId;
-      //   setNodeDataMap((prev) => ({
-      //     ...prev,
-      //     [newId]: {
-      //       id: newId,
-      //       tag,
-      //       description,
-      //       date,
-      //     },
-      //   }));
-      //   setNextNodeId((prev) => prev + 1);
-      //   // Update recent tags
-      //   setRecentTags((prev) => {
-      //     const filtered = prev.filter(
-      //       (t) => !(t.name === tag.name && t.color === tag.color)
-      //     );
-      //     return [tag, ...filtered].slice(0, 5);
-      //   });
-      //   // Scroll to the new node's date
-      //   if (timelineRef.current) {
-      //     timelineRef.current.scrollToDate(date);
-      //   }
-      // }
-      // handleCloseModal();
-    };
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setSelectedNodeId(null);
+  };
 
-  const handleDeleteArchive = () => {
-    if (selectedNodeId !== null) {
-      // Remove node from nodeDataMap
-      setNodeDataMap((prev) => {
-        const newMap = { ...prev };
-        delete newMap[selectedNodeId];
-        return newMap;
-      });
+  const handleEditArchive = () => {
+    setIsViewModalOpen(false);
+    setIsEditModalOpen(true); // ArchiveModal 열기 (편집 모드)
+  };
+
+  const handleSaveArchive = async (date: Date | null) => {
+    // 저장 후 데이터 다시 불러오기
+    if (user) {
+      try {
+        const updatedBoards = await readBoardsWithTags();
+        setBoards(updatedBoards);
+      } catch (error) {
+        console.error("Failed to reload boards:", error);
+      }
     }
-    handleCloseModal();
+
+    // Scroll to date if provided
+    if (date && timelineRef.current) {
+      timelineRef.current.scrollToDate(date);
+    }
+
+    handleCloseEditModal();
+  };
+
+  const handleDeleteArchive = async () => {
+    // 삭제 후 데이터 다시 불러오기
+    if (user) {
+      try {
+        const updatedBoards = await readBoardsWithTags();
+        setBoards(updatedBoards);
+      } catch (error) {
+        console.error("Failed to reload boards:", error);
+      }
+    }
+
+    handleCloseEditModal();
   };
 
   const handleDateSelect = (date: Date) => {
@@ -195,13 +193,6 @@ export default function App() {
     setSearchQuery("");
     setMatchedNodeIds(new Set());
   };
-
-  // useEffect(() => {
-  //   if (!isSearching) {
-  //     setSearchQuery("");
-  //     setMatchedNodeIds(new Set());
-  //   }
-  // }, [isSearching]);
 
   return (
     <>
@@ -306,18 +297,43 @@ export default function App() {
           />
         )}
 
+        {(() => {
+          const currentViewNodeData =
+            selectedNodeId !== null
+              ? boardToNodeData(nodeDataMap[selectedNodeId])
+              : undefined;
+
+          if (currentViewNodeData) {
+            console.log(
+              "Data passed to ViewArchiveModal:",
+              currentViewNodeData
+            );
+          }
+
+          return (
+            <ViewArchiveModal
+              isOpen={isViewModalOpen}
+              onClose={handleCloseViewModal}
+              onEdit={handleEditArchive}
+              onDelete={handleDeleteArchive}
+              currentNodeData={currentViewNodeData}
+            />
+          );
+        })()}
+
         {/* Archive Modal */}
-        {/* <ArchiveModal
-          isOpen={isModalOpen}
-          onClose={handleCloseModal}
+        <ArchiveModal
+          isOpen={isEditModalOpen}
+          onClose={handleCloseEditModal}
           onSave={handleSaveArchive}
           onDelete={handleDeleteArchive}
           position={modalPosition}
-          recentTags={recentTags}
           currentNodeData={
-            selectedNodeId !== null ? nodeDataMap[selectedNodeId] : undefined
+            selectedNodeId !== null
+              ? boardToNodeData(nodeDataMap[selectedNodeId])
+              : undefined
           }
-        /> */}
+        />
       </div>
     </>
   );

@@ -8,24 +8,12 @@ import {
   updateBoard,
   readBoardById,
 } from "../../commons/libs/supabase/db";
-
-interface NodeTag {
-  name: string;
-  color: string;
-}
-
-interface NodeData {
-  id: string;
-  tag?: NodeTag;
-  title?: string;
-  description?: string;
-  date?: Date;
-}
+import { NodeData, NodeTag } from "@/commons/types/types";
 
 interface ArchiveModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (tag: NodeTag | null, description: string, date: Date | null) => void;
+  onSave: (date: Date | null) => void;
   onDelete: () => void;
   position?: { x: number; y: number } | null;
   currentNodeData?: NodeData;
@@ -265,11 +253,7 @@ export function ArchiveModal({
         selectedHour,
         selectedMinute
       );
-      onSave(
-        selectedTags.length > 0 ? selectedTags[0] : null,
-        description,
-        date
-      );
+      onSave(date);
 
       // 모달 닫기
       onClose();

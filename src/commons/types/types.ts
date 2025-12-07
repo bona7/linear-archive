@@ -23,3 +23,16 @@ export interface FetchModalProps {
   onClose: () => void;
   post: Post;
 }
+
+export interface NodeTag {
+  name: string;
+  color: string;
+}
+
+export interface NodeData {
+  id: string;
+  tag?: NodeTag;
+  title?: string;
+  description?: string;
+  date?: Date;
+}

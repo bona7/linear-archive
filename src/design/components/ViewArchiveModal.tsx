@@ -1,19 +1,7 @@
 import { X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { readBoardById, deleteBoard } from "../../commons/libs/supabase/db";
-
-interface NodeTag {
-  name: string;
-  color: string;
-}
-
-interface NodeData {
-  id: string;
-  tag?: NodeTag;
-  title?: string;
-  description?: string;
-  date?: Date;
-}
+import { NodeData, NodeTag } from "@/commons/types/types";
 
 interface ViewArchiveModalProps {
   isOpen: boolean;

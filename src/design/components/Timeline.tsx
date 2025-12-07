@@ -50,15 +50,6 @@ export const Timeline = forwardRef<
       return new Map(nodeDataMap.map((node) => [node.board_id, node]));
     }, [nodeDataMap]);
 
-//     // Convert date to position percentage
-//     const dateToPosition = (date: Date) => {
-//       const startDate = new Date(2024, 9, 1); // Oct 2024
-//       const endDate = new Date(2025, 11, 31); // Dec 2025
-//       const totalDays =
-//         (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-//       const daysSinceStart =
-//         (date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-
     // [추가] 1. 데이터에 따라 시작일(가장 오래된 날짜)과 종료일(오늘) 자동 계산
     const { startDate, endDate } = useMemo(() => {
       const today = new Date();
@@ -66,12 +57,12 @@ export const Timeline = forwardRef<
       today.setHours(23, 59, 59, 999);
 
       // 데이터 노드들에서 날짜만 뽑아내기
-      const nodes = Object.values(nodesById);
+      const nodes = Array.from(nodesById.values());
       const dates = nodes
-        .map(node => node.date)
-        .filter((date): date is Date => date !== undefined);
+        .map((node) => new Date(node.date)) // node.date는 string이므로 Date 객체로 변환                              │
+        .filter((date) => !isNaN(date.getTime()));
 
-      // 하드코딩된 예시 데이터(dataNodes)의 날짜는 없다고 가정하고, 
+      // 하드코딩된 예시 데이터(dataNodes)의 날짜는 없다고 가정하고,
       // 실제 데이터가 없으면 '오늘로부터 3개월 전'을 기본값으로 씀
       if (dates.length === 0) {
         const defaultStart = new Date(today);
@@ -80,7 +71,7 @@ export const Timeline = forwardRef<
       }
 
       // 가장 오래된 날짜 찾기
-      const oldestDate = new Date(Math.min(...dates.map(d => d.getTime())));
+      const oldestDate = new Date(Math.min(...dates.map((d) => d.getTime())));
 
       // [디자인 팁] 가장 오래된 날짜보다 7일 정도 여유를 둬서 왼쪽 벽에 딱 붙지 않게 함
       const adjustedStart = new Date(oldestDate);
@@ -94,7 +85,8 @@ export const Timeline = forwardRef<
     };
 
     // [추가] 2. 전체 기간(일수) 계산 - 이걸 기준으로 비율을 나눕니다
-    const totalDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+    const totalDays =
+      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
 
     // [추가] 데이터 기간에 맞춘 반응형 최대 줌 배율 계산
     const maxZoom = useMemo(() => {
@@ -110,7 +102,8 @@ export const Timeline = forwardRef<
     // Convert date to position percentage
     const dateToPosition = (date: Date) => {
       // [수정] 고정 날짜 삭제하고 계산된 변수 사용
-      const daysSinceStart = (date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+      const daysSinceStart =
+        (date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
       // 전체 기간 대비 며칠이나 지났는지 백분율 계산
       return Math.max(0, Math.min(100, (daysSinceStart / totalDays) * 100));
     };
@@ -161,7 +154,8 @@ export const Timeline = forwardRef<
         const maxScroll = scrollWidth - clientWidth;
 
         // Calculate scroll percentage (0-100)
-        const scrollPercentage = maxScroll > 0 ? (scrollLeft / maxScroll) * 100 : 0;
+        const scrollPercentage =
+          maxScroll > 0 ? (scrollLeft / maxScroll) * 100 : 0;
         setScrollPosition(scrollPercentage);
       }
     };
@@ -184,12 +178,12 @@ export const Timeline = forwardRef<
           // 줌 속도 조절 (숫자가 작을수록 부드럽게 변함)
           const delta = -e.deltaY * 0.001;
 
-          setZoom(prev => {
+          setZoom((prev) => {
             const newZoom = Math.max(0.25, Math.min(maxZoom, prev + delta)); // 👈 maxZoom 적용
 
             pendingZoomAdjustment.current = {
               mouseX,
-              previousZoom: prev
+              previousZoom: prev,
             };
             return newZoom;
           }); // }, [maxZoom]);
@@ -197,22 +191,22 @@ export const Timeline = forwardRef<
       };
 
       // wheel 이벤트에 { passive: false } 옵션을 줘야 preventDefault가 작동합니다.
-      timeline.addEventListener('wheel', onWheel, { passive: false });
-      timeline.addEventListener('scroll', handleScroll);
+      timeline.addEventListener("wheel", onWheel, { passive: false });
+      timeline.addEventListener("scroll", handleScroll);
 
       // 모바일/트랙패드 제스처 확대 방지
       const preventGesture = (e: Event) => e.preventDefault();
-      timeline.addEventListener('gesturestart', preventGesture);
-      timeline.addEventListener('gesturechange', preventGesture);
-      timeline.addEventListener('gestureend', preventGesture);
+      timeline.addEventListener("gesturestart", preventGesture);
+      timeline.addEventListener("gesturechange", preventGesture);
+      timeline.addEventListener("gestureend", preventGesture);
 
       // 뒷정리 (Component가 사라질 때 이벤트도 같이 삭제)
       return () => {
-        timeline.removeEventListener('wheel', onWheel);
-        timeline.removeEventListener('scroll', handleScroll);
-        timeline.removeEventListener('gesturestart', preventGesture);
-        timeline.removeEventListener('gesturechange', preventGesture);
-        timeline.removeEventListener('gestureend', preventGesture);
+        timeline.removeEventListener("wheel", onWheel);
+        timeline.removeEventListener("scroll", handleScroll);
+        timeline.removeEventListener("gesturestart", preventGesture);
+        timeline.removeEventListener("gesturechange", preventGesture);
+        timeline.removeEventListener("gestureend", preventGesture);
       };
     }, []);
 
@@ -226,7 +220,7 @@ export const Timeline = forwardRef<
 
       // YYYY/MM 형태로 변경 (예: 2025/01)
       const year = resultDate.getFullYear();
-      const month = String(resultDate.getMonth() + 1).padStart(2, '0');
+      const month = String(resultDate.getMonth() + 1).padStart(2, "0");
       return `${year}/${month}`;
     };
 
@@ -236,7 +230,7 @@ export const Timeline = forwardRef<
       if (!timelineRef.current) {
         return {
           left: getDateFromPosition(0),
-          right: getDateFromPosition(100)
+          right: getDateFromPosition(100),
         };
       }
 
@@ -250,7 +244,7 @@ export const Timeline = forwardRef<
 
       return {
         left: getDateFromPosition(startPercentage),
-        right: getDateFromPosition(endPercentage)
+        right: getDateFromPosition(endPercentage),
       };
     };
 
@@ -285,11 +279,13 @@ export const Timeline = forwardRef<
             currentCluster.push(node);
           } else {
             // Save current cluster and start new one
-            const centerPos = currentCluster.reduce((sum, n) => sum + n.position, 0) / currentCluster.length;
+            const centerPos =
+              currentCluster.reduce((sum, n) => sum + n.position, 0) /
+              currentCluster.length;
             clusters.push({
               id: clusterId++,
               centerPosition: centerPos,
-              nodes: [...currentCluster]
+              nodes: [...currentCluster],
             });
             currentCluster = [node];
           }
@@ -297,7 +293,9 @@ export const Timeline = forwardRef<
 
         // Handle last cluster
         if (index === sorted.length - 1 && currentCluster.length > 0) {
-          const centerPos = currentCluster.reduce((sum, n) => sum + n.position, 0) / currentCluster.length;
+          const centerPos =
+            currentCluster.reduce((sum, n) => sum + n.position, 0) /
+            currentCluster.length;
           clusters.push({
             id: clusterId++,
             centerPosition: centerPos,
@@ -312,7 +310,11 @@ export const Timeline = forwardRef<
     const clusters = clusterNodes(allNodes);
 
     // Calculate node offset within a cluster (pinwheel pattern)
-    const getNodeOffset = (clusterSize: number, index: number, isHovered: boolean) => {
+    const getNodeOffset = (
+      clusterSize: number,
+      index: number,
+      isHovered: boolean
+    ) => {
       if (clusterSize === 1) return { x: 0, y: 0 };
 
       // Radius: small when not hovered, large when hovered for easy clicking
@@ -347,27 +349,28 @@ export const Timeline = forwardRef<
     const getMonthMarkers = () => {
       const markers = [];
       let currentDate = new Date(startDate);
-      currentDate.setDate(1); 
-      
+      currentDate.setDate(1);
+
       if (currentDate < startDate) {
         currentDate.setMonth(currentDate.getMonth() + 1);
       }
 
       const visibleDays = getVisibleDays();
-      
+
       // [조건] 화면에 5년치(1800일) 이상이 한 번에 보일 때만 분기(3개월)로 줄임
       // 즉, 지금 데이터(약 1.5년) 수준에서는 웬만하면 항상 '매월' 표시됨
       let monthStep = 1;
-      if (visibleDays > 1800) monthStep = 3; 
+      if (visibleDays > 1800) monthStep = 3;
 
       while (currentDate <= endDate) {
-        const daysSinceStart = (currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+        const daysSinceStart =
+          (currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
         const position = (daysSinceStart / totalDays) * 100;
 
         const month = currentDate.getMonth() + 1;
         const year = currentDate.getFullYear();
         const isJanuary = month === 1;
-        
+
         const shouldShowMonth = (month - 1) % monthStep === 0;
 
         if (position >= 0 && position <= 100) {
@@ -376,7 +379,7 @@ export const Timeline = forwardRef<
               position,
               label: isJanuary ? `${year}년` : `${month}월`,
               monthOnly: isJanuary ? `${year}년` : `${month}월`,
-              isYear: isJanuary
+              isYear: isJanuary,
             });
           }
         }
@@ -391,33 +394,30 @@ export const Timeline = forwardRef<
     const getDateLabels = () => {
       const visibleDays = getVisibleDays();
       const labels = [];
-      
+
       // [조건] 화면에 약 2.5년(900일) 이상 보이면 날짜 숨김
       // (이때는 위의 getMonthMarkers에 의해 '매월'은 표시되고 있음 -> 역전 해결)
       if (visibleDays > 900) return [];
 
       // [간격 결정] 숫자가 높을수록 더 넓은 화면에서 해당 간격이 나타남
       let step = 1;
-      
+
       // 1. [10일 간격]: ~900일 (약 2.5년) 보일 때
       if (visibleDays > 450) step = 10;
-      
-      // 2. [7일 간격]: ~450일 (약 1.2년) 보일 때 (요청하신 대로 적당한 유지)
+      // 2. [7일 간격]: ~450일 (약 1.2년) 보일 때 (적당한 유지)
       else if (visibleDays > 250) step = 7;
-      
       // 3. [3일 간격]: 🚨 ~250일 (약 8개월) 보이면 바로 진입! (기존보다 훨씬 빨라짐)
       else if (visibleDays > 150) step = 3;
-      
       // 4. [2일 간격]: 🚨 ~150일 (약 5개월) 보이면 바로 진입!
       else if (visibleDays > 100) step = 2;
-      
       // 5. [1일 간격]: ~100일 (약 3개월) 이하로 보이면 바로 매일 표시
-      else step = 1;      
-      
+      else step = 1;
+
       let currentDate = new Date(startDate);
 
       while (currentDate <= endDate) {
-        const daysSinceStart = (currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+        const daysSinceStart =
+          (currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
         const position = (daysSinceStart / totalDays) * 100;
         const day = currentDate.getDate();
 
@@ -425,11 +425,11 @@ export const Timeline = forwardRef<
           labels.push({
             position,
             day,
-            type: step === 1 ? 'daily' : 'sparse',
-            showLabel: true 
+            type: step === 1 ? "daily" : "sparse",
+            showLabel: true,
           });
         }
-        
+
         currentDate.setDate(currentDate.getDate() + step);
       }
       return labels;
@@ -440,11 +440,13 @@ export const Timeline = forwardRef<
     // Function to scroll to a specific date
     const scrollToDate = (date: Date) => {
       // [수정] 전체 기간 대비 비율 계산
-      const daysSinceStart = (date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+      const daysSinceStart =
+        (date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
       const scrollPercentage = (daysSinceStart / totalDays) * 100;
 
       if (timelineRef.current) {
-        const maxScroll = timelineRef.current.scrollWidth - timelineRef.current.clientWidth;
+        const maxScroll =
+          timelineRef.current.scrollWidth - timelineRef.current.clientWidth;
         timelineRef.current.scrollLeft = (scrollPercentage / 100) * maxScroll;
       }
     };
@@ -498,12 +500,18 @@ export const Timeline = forwardRef<
         <div
           ref={timelineRef}
           className="relative w-full h-48 overflow-x-auto overflow-y-hidden timeline-container"
-        // onWheel={handleWheel}
+          // onWheel={handleWheel}
         >
           {/* Extended Timeline Content - Dynamic width based on zoom */}
-          <div className="relative h-full" style={{ width: `${400 * zoom}%`, minWidth: `${400 * zoom}%` }}>
+          <div
+            className="relative h-full"
+            style={{ width: `${400 * zoom}%`, minWidth: `${400 * zoom}%` }}
+          >
             {/* Main Ruler Line */}
-            <div className="absolute w-full h-0.5 bg-black" style={{ top: '50%', transform: 'translateY(-50%)' }}>
+            <div
+              className="absolute w-full h-0.5 bg-black"
+              style={{ top: "50%", transform: "translateY(-50%)" }}
+            >
               {/* Month Markers - Thick vertical lines */}
               {monthMarkers.map((marker, index) => (
                 <div
@@ -511,8 +519,8 @@ export const Timeline = forwardRef<
                   className="absolute"
                   style={{
                     left: `${marker.position}%`,
-                    top: '-50%',
-                    transform: 'translateY(-50%)',
+                    top: "-50%",
+                    transform: "translateY(-50%)",
                     // zIndex: marker.isYear ? 2 : 1, // 년도가 월보다 위에 오게. optional
                   }}
                 >
@@ -520,23 +528,23 @@ export const Timeline = forwardRef<
                   <div
                     className="bg-black"
                     style={{
-                      width: marker.isYear ? '2px' : '1px',
-                      height: marker.isYear ? '40px' : '24px',
-                      position: 'absolute',
-                      bottom: '0',
-                      left: '0',
+                      width: marker.isYear ? "2px" : "1px",
+                      height: marker.isYear ? "40px" : "24px",
+                      position: "absolute",
+                      bottom: "0",
+                      left: "0",
                     }}
                   />
                   {/* Month label */}
                   <span
                     className="absolute"
                     style={{
-                      left: '6px',
-                      bottom: marker.isYear ? '32px' : '16px',
-                      fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace',
-                      fontSize: marker.isYear ? '14px' : '12px',
-                      fontWeight: marker.isYear ? 'bold' : 'normal',
-                      whiteSpace: 'nowrap',
+                      left: "6px",
+                      bottom: marker.isYear ? "32px" : "16px",
+                      fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                      fontSize: marker.isYear ? "14px" : "12px",
+                      fontWeight: marker.isYear ? "bold" : "normal",
+                      whiteSpace: "nowrap",
                     }}
                   >
                     {marker.monthOnly}
@@ -552,10 +560,10 @@ export const Timeline = forwardRef<
                     className="absolute bg-black"
                     style={{
                       left: `${label.position}%`,
-                      width: '1px',
+                      width: "1px",
                       // daily는 짧게(8px), weekly는 조금 길게(12px)
-                      height: label.type === 'daily' ? '8px' : '12px',
-                      top: '-6px',
+                      height: label.type === "daily" ? "8px" : "12px",
+                      top: "-6px",
                     }}
                   />
 
@@ -565,12 +573,13 @@ export const Timeline = forwardRef<
                       className="absolute"
                       style={{
                         left: `${label.position}%`,
-                        top: '-20px',
-                        transform: 'translateX(-50%)',
-                        fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace',
-                        fontSize: '11px',
-                        color: label.day === 1 ? 'black' : '#666', // 1일은 진하게
-                        fontWeight: label.day === 1 ? 'bold' : 'normal',
+                        top: "-20px",
+                        transform: "translateX(-50%)",
+                        fontFamily:
+                          "SF Mono, Menlo, Monaco, Consolas, monospace",
+                        fontSize: "11px",
+                        color: label.day === 1 ? "black" : "#666", // 1일은 진하게
+                        fontWeight: label.day === 1 ? "bold" : "normal",
                       }}
                     >
                       {label.day}
@@ -584,13 +593,14 @@ export const Timeline = forwardRef<
             {allNodes.map((node) => (
               <div
                 key={`vline-${node.id}`}
-                className={`absolute bg-black transition-opacity duration-300 ${selectedNodeId === node.id ? 'opacity-100' : 'opacity-0'
-                  }`}
+                className={`absolute bg-black transition-opacity duration-300 ${
+                  selectedNodeId === node.id ? "opacity-100" : "opacity-0"
+                }`}
                 style={{
                   left: `${node.position}%`,
-                  width: '2px',
-                  height: '100vh',
-                  bottom: '50%',
+                  width: "2px",
+                  height: "100vh",
+                  bottom: "50%",
                   zIndex: 0,
                 }}
               />
@@ -600,7 +610,7 @@ export const Timeline = forwardRef<
             {allNodes.map((node) => {
               const nodeData = nodesById.get(node.id);
               if (!nodeData) return null;
-              const nodeTag = nodeData.tags;
+              const nodeTag = nodeData.tags[0];
 
               // Search filtering
               const isSearching = searchQuery.trim().length > 0;
@@ -657,7 +667,7 @@ export const Timeline = forwardRef<
                     className="w-4 h-4 transition-all"
                     style={{
                       borderRadius: "50%",
-                      backgroundColor: nodeTag[0]?.tag_color || "#F2F0EB",
+                      backgroundColor: nodeTag?.tag_color || "#F2F0EB",
                       border: shouldHighlight
                         ? "3px solid black"
                         : isSelected
