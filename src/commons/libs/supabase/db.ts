@@ -1,6 +1,6 @@
 import { supabase } from "./client";
 import { uploadPostImage, getPostImageUrl } from "./storage";
-import { CallEmbedding } from "../lambda/embeddingClient";
+import { CallEmbedding } from "../voyage/embeddingClient";
 
 // 타입 정의
 export interface Board {
