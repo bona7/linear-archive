@@ -15,7 +15,7 @@ import {
   deleteBoard, // Assuming deleteBoard exists in db.ts and takes boardId: string
 } from "@/commons/libs/supabase/db";
 import { Router, useRouter } from "next/router";
-import { match } from "assert";
+import { AnalysisPanel } from "@/design/components/AnalysisPanel";
 
 export default function App() {
   const router = useRouter();
@@ -35,6 +35,7 @@ export default function App() {
   const [displayNameValue, setDisplayNameValue] = useState<string | null>(null);
   const [tags, setTags] = useState<NodeTag[]>([]);
   const [selectedFilterTags, setSelectedFilterTags] = useState<NodeTag[]>([]);
+  const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false); // AnalysisPanel 상태 추가
 
   const nodeDataMap = useMemo(() => {
     return Object.fromEntries(boards.map((board) => [board.board_id, board]));
@@ -264,6 +265,10 @@ export default function App() {
     });
   };
 
+  const handleToggleAnalysisPanel = () => {
+    setIsAnalysisPanelOpen((prev) => !prev);
+  };
+
   useEffect(() => {
     console.log("검색/필터링 매칭 노드:", matchedNodeIds);
   }, [matchedNodeIds]);
@@ -272,6 +277,14 @@ export default function App() {
     <>
       {/* Login Modal */}
       <LoginModal isOpen={!user} onLogin={handleLogin} />
+
+      {user && (
+        <AnalysisPanel
+          isOpen={isAnalysisPanelOpen}
+          onToggle={handleToggleAnalysisPanel}
+          boards={boards}
+        />
+      )}
 
       {/* Header - Always visible and clear */}
       <header className="fixed top-0 left-0 right-0 pt-8 pb-8 pointer-events-none z-[100]">

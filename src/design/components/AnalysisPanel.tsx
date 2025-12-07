@@ -6,6 +6,8 @@ import {
   TrendingUp,
   BarChart3,
 } from "lucide-react";
+import { BoardWithTags } from "@/commons/libs/supabase/db";
+import { fetchAnalysis } from "@/components/commons/units/AnalysisCall/AnalysisCall.index";
 
 interface AnalysisData {
   fact1: string;
@@ -29,33 +31,32 @@ interface NodeData {
 interface AnalysisPanelProps {
   isOpen: boolean;
   onToggle: () => void;
-  nodeDataMap: Record<number, NodeData>;
+  boards: BoardWithTags[];
 }
 
 export function AnalysisPanel({
   isOpen,
   onToggle,
-  nodeDataMap,
+  boards,
 }: AnalysisPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [analysisData, setAnalysisData] =
-    useState<AnalysisData | null>(null);
+  const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setAnalysisData({
-        // 더미 데이터를 넣어뒀습니다.
-        fact1:
-          "2024년 11월이 가장 활발한 시기로, 12개의 아카이브 항목이 기록되었습니다.",
-        fact2:
-          "주당 평균 2.5개의 항목을 꾸준히 아카이브하고 있습니다.",
-        analysis:
-          "다양한 관심사에 대한 강한 참여도를 보여줍니다. 데이터는 카테고리 전반에 걸쳐 균형 잡힌 분포를 나타내며, 특히 늦가을에 활동이 급증했습니다. 이는 계절적 요인이 아카이빙 행동에 영향을 미친다는 것을 시사합니다.",
-      });
+    setAnalysisData(null); // Clear previous analysis
+
+    try {
+      const data = await fetchAnalysis(boards);
+      if (data) {
+        setAnalysisData(data);
+      }
+    } catch (error) {
+      console.error("Failed to get analysis:", error);
+      // Optionally, set an error state to show in the UI
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -85,9 +86,7 @@ export function AnalysisPanel({
           top: "0",
           width: "300px",
           height: "400px",
-          transform: isOpen
-            ? "translate(0, 0)"
-            : "translate(-100%, 0)",
+          transform: isOpen ? "translate(0, 0)" : "translate(-100%, 0)",
           zIndex: 105,
           pointerEvents: isOpen ? "auto" : "none",
         }}
@@ -98,8 +97,7 @@ export function AnalysisPanel({
             <Sparkles size={14} strokeWidth={1.5} />
             <span
               style={{
-                fontFamily:
-                  "SF Mono, Menlo, Monaco, Consolas, monospace",
+                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
                 fontSize: "11px",
                 letterSpacing: "0.05em",
               }}
@@ -128,8 +126,7 @@ export function AnalysisPanel({
               </div>
               <span
                 style={{
-                  fontFamily:
-                    "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
                   fontSize: "12px",
                 }}
               >
@@ -145,8 +142,7 @@ export function AnalysisPanel({
                   <TrendingUp size={14} strokeWidth={1.5} />
                   <span
                     style={{
-                      fontFamily:
-                        "SF Mono, Menlo, Monaco, Consolas, monospace",
+                      fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
                       fontSize: "11px",
                       letterSpacing: "0.05em",
                     }}
@@ -157,8 +153,7 @@ export function AnalysisPanel({
                 <div
                   className="border border-black bg-white p-3"
                   style={{
-                    fontFamily:
-                      "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
                     fontSize: "13px",
                     lineHeight: "1.6",
                   }}
@@ -173,8 +168,7 @@ export function AnalysisPanel({
                   <BarChart3 size={14} strokeWidth={1.5} />
                   <span
                     style={{
-                      fontFamily:
-                        "SF Mono, Menlo, Monaco, Consolas, monospace",
+                      fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
                       fontSize: "11px",
                       letterSpacing: "0.05em",
                     }}
@@ -185,8 +179,7 @@ export function AnalysisPanel({
                 <div
                   className="border border-black bg-white p-3"
                   style={{
-                    fontFamily:
-                      "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
                     fontSize: "13px",
                     lineHeight: "1.6",
                   }}
@@ -200,8 +193,7 @@ export function AnalysisPanel({
                 <div className="border-b border-black pb-1 mb-2">
                   <span
                     style={{
-                      fontFamily:
-                        "SF Mono, Menlo, Monaco, Consolas, monospace",
+                      fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
                       fontSize: "11px",
                       letterSpacing: "0.05em",
                     }}
@@ -212,8 +204,7 @@ export function AnalysisPanel({
                 <div
                   className="border border-black bg-[#F2F0EB] p-3"
                   style={{
-                    fontFamily:
-                      "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
                     fontSize: "13px",
                     lineHeight: "1.6",
                   }}
@@ -228,18 +219,15 @@ export function AnalysisPanel({
                 className="w-full text-[#F2F0EB] py-2.5 border border-black hover:bg-black transition-colors"
                 style={{ backgroundColor: "#8B857D" }}
                 onMouseEnter={(e) =>
-                  (e.currentTarget.style.backgroundColor =
-                    "#3A3834")
+                  (e.currentTarget.style.backgroundColor = "#3A3834")
                 }
                 onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor =
-                    "#8B857D")
+                  (e.currentTarget.style.backgroundColor = "#8B857D")
                 }
               >
                 <span
                   style={{
-                    fontFamily:
-                      "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
                     fontSize: "13px",
                     letterSpacing: "0.05em",
                   }}
@@ -256,8 +244,7 @@ export function AnalysisPanel({
               </div>
               <span
                 style={{
-                  fontFamily:
-                    "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
                   fontSize: "12px",
                 }}
               >
@@ -268,18 +255,15 @@ export function AnalysisPanel({
                 className="text-[#F2F0EB] py-2.5 border border-black transition-colors px-6"
                 style={{ backgroundColor: "#8B857D" }}
                 onMouseEnter={(e) =>
-                  (e.currentTarget.style.backgroundColor =
-                    "#3A3834")
+                  (e.currentTarget.style.backgroundColor = "#3A3834")
                 }
                 onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor =
-                    "#8B857D")
+                  (e.currentTarget.style.backgroundColor = "#8B857D")
                 }
               >
                 <span
                   style={{
-                    fontFamily:
-                      "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
                     fontSize: "12px",
                     letterSpacing: "0.05em",
                   }}
