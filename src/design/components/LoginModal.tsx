@@ -5,7 +5,7 @@ import supabase_logo from "public/assets/supabase_logo.png";
 import {
   signIn,
   signUp,
-  updateDisplayName,
+  //updateDisplayName,
   getDisplayName,
 } from "../../commons/libs/supabase/auth";
 
@@ -29,7 +29,7 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
   const [signUpPassword, setSignUpPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [nickname, setNickname] = useState("");
-  const [emailVerified, setEmailVerified] = useState(false);
+  //const [emailVerified, setEmailVerified] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -38,7 +38,7 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
     if (isOpen) {
       setIsSignUpMode(false);
       setSignUpStep("email");
-      setEmailVerified(false);
+      //setEmailVerified(false);
       setLoginEmail("");
       setLoginPassword("");
       setSignUpEmail("");
@@ -80,7 +80,7 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
 
   const handleSignUpEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (signUpEmail.trim() && signUpPassword.trim() && passwordsMatch) {
+    /*if (signUpEmail.trim() && signUpPassword.trim() && passwordsMatch) {
       setIsLoading(true);
       setErrorMessage(null);
       try {
@@ -97,12 +97,17 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
       } finally {
         setIsLoading(false);
       }
+    }*/
+    if (signUpEmail.trim() && signUpPassword.trim() && passwordsMatch) {
+      setErrorMessage(null);
+      //여기서는 가입 요청(signUp)하지 않고, 닉네임 입력 단계로 이동
+      setSignUpStep("nickname");
     }
   };
 
   const handleNicknameSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (emailVerified && nickname.trim()) {
+    /*if (emailVerified && nickname.trim()) {
       setIsLoading(true);
       setErrorMessage(null);
       try {
@@ -116,17 +121,44 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
       } finally {
         setIsLoading(false);
       }
+    }*/
+    if (!nickname.trim()) return;
+    if (!signUpEmail.trim() || !signUpPassword.trim()) return;
+
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      // 여기서 실제 회원가입 요청 + 닉네임을 user_metadata에 저장
+      await signUp({
+        email: signUpEmail,
+        password: signUpPassword,
+        displayName: nickname,
+      });
+
+      setSignUpStep("success");
+    } catch (error: any) {
+      console.error("Sign up failed:", error);
+      setErrorMessage(error.message || "회원가입에 실패했습니다.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleFinalLogin = () => {
-    onLogin(); // onLogin 호출 (부모에서 다시 불러옴)
+    //onLogin(nickname);
+    // 실제 로그인 없이 onLogin 호출하지 않음
+    // 인증 메일 확인 후 로그인 화면으로 돌아가도록 처리
+    setIsSignUpMode(false);
+    setSignUpStep("email");
+    setLoginEmail(signUpEmail); // 선택: 이메일 미리 채워주기
+    setLoginPassword("");
   };
 
   const handleToggleMode = () => {
     setIsSignUpMode(!isSignUpMode);
     setSignUpStep("email");
-    setEmailVerified(false);
+    //setEmailVerified(false);
     setLoginEmail("");
     setLoginPassword("");
     setSignUpEmail("");
@@ -438,51 +470,7 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
             </div>
           )}
 
-          {/* Email Verification Checkbox */}
-          <div className="flex items-center gap-3 justify-center mb-6">
-            <button
-              type="button"
-              onClick={() => setEmailVerified(!emailVerified)}
-              className="flex items-center justify-center"
-              style={{ width: "25px", height: "25px" }}
-            >
-              {emailVerified ? (
-                <div
-                  className="relative"
-                  style={{ width: "25px", height: "25px" }}
-                >
-                  <svg
-                    className="block size-full"
-                    fill="none"
-                    preserveAspectRatio="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      clipRule="evenodd"
-                      d={svgPaths.p39bcd700}
-                      fill="#5C5C5C"
-                      fillRule="evenodd"
-                    />
-                  </svg>
-                </div>
-              ) : (
-                <div
-                  className="border-2 border-[#5C5C5C]"
-                  style={{ width: "25px", height: "25px" }}
-                />
-              )}
-            </button>
-            <span
-              style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
-                fontSize: "13px",
-                fontWeight: "bold",
-                color: "#5C5C5C",
-              }}
-            >
-              이메일 인증을 완료했어요
-            </span>
-          </div>
+          {/*email verification checkbox 삭제*/}
 
           {/* Nickname Input */}
           <form onSubmit={handleNicknameSubmit} className="space-y-6">
@@ -516,7 +504,8 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
             {/* Complete Button */}
             <button
               type="submit"
-              disabled={!emailVerified || isLoading}
+              //disabled={!emailVerified || isLoading}
+              disabled={isLoading || !nickname.trim()}
               className="w-full border-2 border-black bg-black text-[#F2F0EB] px-6 py-3 hover:bg-[#F2F0EB] hover:text-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
