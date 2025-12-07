@@ -91,7 +91,7 @@ export default function TokenInitializer() {
             router.pathname.startsWith(path)
           )
         ) {
-          router.push("/login");
+          router.push("/");
         }
       }
     });

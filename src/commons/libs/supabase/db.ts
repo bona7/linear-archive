@@ -1,5 +1,6 @@
 import { supabase } from "./client";
 import { uploadPostImage, getPostImageUrl } from "./storage";
+import { getSession } from "./auth";
 
 // 타입 정의
 export interface Board {
@@ -45,14 +46,11 @@ export interface CreateBoardParams {
  */
 export async function createBoard(params: CreateBoardParams) {
   // 1. 현재 사용자 ID 가져오기
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (userError || !user) {
+  const session = await getSession();
+  if (!session?.user) {
     throw new Error("User not authenticated");
   }
-  const userId = user.id;
+  const userId = session.user.id;
 
   // 2. board_id 미리 생성 (이미지 업로드에 사용)
   const boardId = crypto.randomUUID();
@@ -199,12 +197,8 @@ export async function createBoard(params: CreateBoardParams) {
  */
 export async function readBoardsWithTags(): Promise<BoardWithTags[]> {
   // 현재 사용자 인증 확인
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const session = await getSession();
+  if (!session?.user) {
     throw new Error("User not authenticated");
   }
 
@@ -279,12 +273,8 @@ export async function readBoardById(
   boardId: string
 ): Promise<BoardWithTags | null> {
   // 현재 사용자 인증 확인
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const session = await getSession();
+  if (!session?.user) {
     throw new Error("User not authenticated");
   }
 
@@ -345,12 +335,8 @@ export async function readBoardById(
  */
 export async function getCurrentUserTags(): Promise<Tag[]> {
   // 현재 사용자 인증 확인
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const session = await getSession();
+  if (!session?.user) {
     throw new Error("User not authenticated");
   }
 
@@ -381,12 +367,11 @@ export async function updateBoard(
     image?: File;
   }
 ) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  const session = await getSession();
+  if (!session?.user) {
     throw new Error("User not authenticated");
   }
+  const user = session.user;
 
   // board 업데이트 (현재 사용자의 board만 수정 가능)
   const boardUpdates: any = {};
@@ -468,11 +453,8 @@ export async function updateBoard(
  */
 export async function deleteBoard(boardId: string) {
   // 현재 사용자 인증 확인
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (userError || !user) {
+  const session = await getSession();
+  if (!session?.user) {
     throw new Error("User not authenticated");
   }
 

@@ -5,7 +5,7 @@ import supabase_logo from "public/assets/supabase_logo.png";
 import {
   signIn,
   signUp,
-  //updateDisplayName,
+  updateDisplayName,
   getDisplayName,
 } from "../../commons/libs/supabase/auth";
 
@@ -80,14 +80,15 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
 
   const handleSignUpEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    /*if (signUpEmail.trim() && signUpPassword.trim() && passwordsMatch) {
+    if (signUpEmail.trim() && signUpPassword.trim() && passwordsMatch) {
       setIsLoading(true);
       setErrorMessage(null);
       try {
+        // 이메일 인증 코드 전송을 위해 signUp 호출
         await signUp({
           email: signUpEmail,
           password: signUpPassword,
-          displayName: "", // 나중에 닉네임 단계에서 설정
+          displayName: "", // 닉네임은 아직 설정하지 않음
         });
         // 회원가입 성공 시 다음 단계로
         setSignUpStep("nickname");
@@ -97,49 +98,23 @@ export function LoginModal({ isOpen, onLogin }: LoginModalProps) {
       } finally {
         setIsLoading(false);
       }
-    }*/
-    if (signUpEmail.trim() && signUpPassword.trim() && passwordsMatch) {
-      setErrorMessage(null);
-      //여기서는 가입 요청(signUp)하지 않고, 닉네임 입력 단계로 이동
-      setSignUpStep("nickname");
     }
   };
 
   const handleNicknameSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    /*if (emailVerified && nickname.trim()) {
-      setIsLoading(true);
-      setErrorMessage(null);
-      try {
-        // 닉네임 업데이트
-        await updateDisplayName(nickname);
-        // 성공 단계로 이동
-        setSignUpStep("success");
-      } catch (error: any) {
-        console.error("Failed to update display name:", error);
-        setErrorMessage(error.message || "닉네임 설정에 실패했습니다.");
-      } finally {
-        setIsLoading(false);
-      }
-    }*/
     if (!nickname.trim()) return;
-    if (!signUpEmail.trim() || !signUpPassword.trim()) return;
 
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
-      // 여기서 실제 회원가입 요청 + 닉네임을 user_metadata에 저장
-      await signUp({
-        email: signUpEmail,
-        password: signUpPassword,
-        displayName: nickname,
-      });
-
+      // 이미 회원가입은 완료되었으므로 닉네임만 업데이트
+      await updateDisplayName(nickname);
       setSignUpStep("success");
     } catch (error: any) {
-      console.error("Sign up failed:", error);
-      setErrorMessage(error.message || "회원가입에 실패했습니다.");
+      console.error("Failed to update display name:", error);
+      setErrorMessage(error.message || "닉네임 설정에 실패했습니다.");
     } finally {
       setIsLoading(false);
     }

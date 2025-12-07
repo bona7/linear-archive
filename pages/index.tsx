@@ -7,7 +7,11 @@ import { LoginModal } from "@/design/components/LoginModal";
 import { ProfileMenu } from "@/design/components/ProfileMenu";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { NodeData, NodeTag } from "@/commons/types/types";
-import { signOut, getUser, getDisplayName } from "@/commons/libs/supabase/auth";
+import {
+  signOut,
+  getSession,
+  getDisplayName,
+} from "@/commons/libs/supabase/auth";
 import {
   BoardWithTags,
   readBoardsWithTags,
@@ -16,6 +20,21 @@ import {
 } from "@/commons/libs/supabase/db";
 import { Router, useRouter } from "next/router";
 import { AnalysisPanel } from "@/design/components/AnalysisPanel";
+import {
+  LoadingOverlay,
+  LoadingIcon,
+} from "@/commons/libraries/loadingOverlay";
+import styled from "@emotion/styled";
+
+// 전체 화면을 덮는 로딩 오버레이
+const FullScreenLoadingOverlay = styled(LoadingOverlay)`
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+`;
 
 export default function App() {
   const router = useRouter();
@@ -36,6 +55,7 @@ export default function App() {
   const [tags, setTags] = useState<NodeTag[]>([]);
   const [selectedFilterTags, setSelectedFilterTags] = useState<NodeTag[]>([]);
   const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false); // AnalysisPanel 상태 추가
+  const [isLoggingOut, setIsLoggingOut] = useState(false); // 로그아웃 로딩 상태 추가
 
   const nodeDataMap = useMemo(() => {
     return Object.fromEntries(boards.map((board) => [board.board_id, board]));
@@ -57,16 +77,31 @@ export default function App() {
 
   const checkUser = async () => {
     try {
-      const currentUser = await getUser();
-      setUser(currentUser);
-      const name = await getDisplayName();
-      setDisplayNameValue(name);
+      const session = await getSession();
+      if (session?.user) {
+        // 상태가 실제로 변경될 때만 업데이트하여 불필요한 리렌더링 방지
+        const displayName =
+          (session.user.user_metadata?.display_name as string) || null;
+
+        if (user?.id !== session.user.id || displayNameValue !== displayName) {
+          setUser(session.user);
+          setDisplayNameValue(displayName);
+        }
+      } else {
+        // user가 이미 null이 아닐 때만 null로 설정
+        if (user !== null) {
+          setUser(null);
+          setDisplayNameValue(null);
+        }
+      }
     } catch (err) {
-      setUser(null);
-      setDisplayNameValue(null);
+      // 에러 발생 시에만 상태 업데이트
+      if (user !== null) {
+        setUser(null);
+        setDisplayNameValue(null);
+      }
     }
   };
-  checkUser();
 
   const timelineRef = useRef<{ scrollToDate: (date: Date) => void }>(null);
 
@@ -111,12 +146,15 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    setIsLoggingOut(true); // 로딩 시작
     try {
       await signOut();
       setUser(null);
       setDisplayNameValue(null);
     } catch (err: any) {
       console.error(err.message || "로그아웃 실패");
+    } finally {
+      setIsLoggingOut(false); // 로딩 종료
     }
   };
 
@@ -277,6 +315,11 @@ export default function App() {
     <>
       {/* Login Modal */}
       <LoginModal isOpen={!user} onLogin={handleLogin} />
+
+      {/* Logout Loading Overlay */}
+      <FullScreenLoadingOverlay visible={isLoggingOut}>
+        <LoadingIcon spin fontSize={48} />
+      </FullScreenLoadingOverlay>
 
       {user && (
         <AnalysisPanel
