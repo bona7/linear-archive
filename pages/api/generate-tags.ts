@@ -12,6 +12,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    const key = process.env.DEEPSEEK_API_KEY || "";
+    console.log(`[DEBUG-TAGS] Key loaded: ${key.slice(0, 5)}...${key.slice(-4)}`);
+    
     console.log(`Asking AI to generate tags...`);
 
     const completion = await openai.chat.completions.create({
@@ -21,18 +24,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         {
           role: "system",
           content: `
-            You are a data generator for a productivity app.
-            1. Output strictly valid JSON.
-            2. The root MUST be an object containing a single key "items" which is an array.
-            3. Each item must have:
-               - tag_name: string (it should be short and concise)
-               - tag_color: string (hex code)
-            4. Generate realistic, varied data.
+            당신은 생산성 앱을 위한 데이터 생성기입니다.
+            1. 반드시 유효한 JSON 형식으로 출력하세요.
+            2. 최상위 루트는 "items"라는 배열 키를 가진 객체여야 합니다.
+            3. 각 항목은 다음을 포함해야 합니다:
+               - tag_name: string (짧고 간결한 한국어 태그 이름)
+               - tag_color: string (hex 코드)
+            4. 현실적이고 다양한 데이터를 생성하세요.
+            5. 모든 텍스트는 한국어로 출력하세요.
           `,
         },
         {
           role: "user",
-          content: `Make a mock personality and Generate 15tags related to your personality. It can be related to your work, hobbies, or personal life. ex) basketball, reading, study etc.`,
+          content: `가상의 페르소나를 만들고 그 성격과 관련된 15개의 태그를 생성하세요. 직업, 취미, 또는 개인적인 삶과 관련될 수 있습니다. 예) 농구, 독서, 공부 등.`,
         },
       ],
     });

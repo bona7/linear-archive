@@ -23,6 +23,7 @@ import {
   LoadingIcon,
 } from "@/commons/libraries/loadingOverlay";
 import styled from "@emotion/styled";
+import { supabase } from "@/commons/libs/supabase/client";
 
 const FullScreenLoadingOverlay = styled(LoadingOverlay)`
   position: fixed !important;
@@ -463,7 +464,7 @@ export default function App() {
 
         {/* Generate Tags Button (Dev Only/Temporary) */}
         {user && (
-          <div className="absolute top-4 right-4 z-[200]">
+          <div className="fixed bottom-4 left-4 z-[99999] flex flex-col gap-2">
             <button
                onClick={async () => {
                  try {
@@ -502,14 +503,9 @@ export default function App() {
                }}
                className="bg-black text-white px-4 py-2 rounded shadow hover:bg-gray-800 transition"
             >
-              Generate Tags (Server)
+              Generate Tags
             </button>
-          </div>
-        )}
-
         {/* Generate Boards Button (Dev Only/Temporary) */}
-        {user && (
-          <div className="absolute top-16 right-4 z-[200]">
             <button
                onClick={async () => {
                  try {
@@ -577,6 +573,38 @@ export default function App() {
                className="bg-black text-white px-4 py-2 rounded shadow hover:bg-gray-800 transition"
             >
               Generate Boards
+            </button>
+            
+            {/* Clear All Button */}
+            <button
+              onClick={async () => {
+                try {                  
+                  // Delete Boards
+                  const { error: boardError } = await supabase
+                    .from('board')
+                    .delete()
+                    .eq('user_id', user.id);
+                    
+                  if (boardError) throw boardError;
+
+                  // Delete Tags
+                  const { error: tagError } = await supabase
+                    .from('tags')
+                    .delete()
+                    .eq('user_id', user.id);
+
+                  if (tagError) throw tagError;
+
+                  alert("모든 데이터가 삭제되었습니다");
+                  window.location.reload();
+                } catch (e: any) {
+                  console.error(e);
+                  alert(`삭제 실패: ${e.message}`);
+                }
+              }}
+              className="bg-red-600 text-white px-4 py-2 rounded shadow hover:bg-red-800 transition block mt-2"
+            >
+              Clear Data
             </button>
           </div>
         )}
