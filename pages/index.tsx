@@ -155,6 +155,7 @@ export default function App() {
       }
     };
     loadTags();
+    setIsSignUpMode(false); // 로그인된 상태에서는 회원가입 모드 해제
   }, [user]);
 
   const handleLogin = () => {
@@ -210,6 +211,12 @@ export default function App() {
     if (user) {
       try {
         const updatedBoards = await readBoardsWithTags();
+        const updatedTags = await getCurrentUserTags();
+        const newNodeTags: NodeTag[] = updatedTags.map((tag) => ({
+          name: tag.tag_name,
+          color: tag.tag_color,
+        }));
+        setTags(newNodeTags);
         setBoards(updatedBoards);
       } catch (error) {
         console.error("Failed to reload boards:", error);
@@ -347,6 +354,10 @@ export default function App() {
       router.replace("/", undefined, { shallow: true });
     }
   }, [router.query, router]);
+
+  useEffect(() => {
+    console.log("isSignUpMode:", isSignUpMode);
+  }, [isSignUpMode]);
 
   return (
     <>
