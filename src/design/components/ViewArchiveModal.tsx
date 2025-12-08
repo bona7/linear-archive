@@ -6,8 +6,8 @@ import { NodeData, NodeTag } from "@/commons/types/types";
 interface ViewArchiveModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onEdit: () => void; // 편집 모드로 전환하는 콜백
-  onDelete?: () => void; // 삭제 후 부모 컴포넌트에서 데이터를 다시 불러오기 위한 콜백
+  onEdit: () => void;
+  onDelete?: () => void;
   currentNodeData?: NodeData;
 }
 
@@ -29,7 +29,6 @@ export function ViewArchiveModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // 모달이 열릴 때 readBoardById로 데이터 불러오기
   useEffect(() => {
     const loadBoardData = async () => {
       if (!isOpen || !currentNodeData?.id) {
@@ -42,20 +41,6 @@ export function ViewArchiveModal({
         const data = await readBoardById(currentNodeData.id);
 
         if (data) {
-          // 콘솔에 데이터 출력
-          console.log("=== 노드 클릭 데이터 ===");
-          console.log("Node ID:", currentNodeData.id);
-          console.log("Board Data:", {
-            date: data.date,
-            time: data.time,
-            description: data.description,
-            tags: data.tags,
-            image_url: data.image_url,
-          });
-          console.log("Full Data:", data);
-          console.log("======================");
-
-          // 태그 배열로 변환
           const tags: NodeTag[] = data.tags.map((tag) => ({
             name: tag.tag_name,
             color: tag.tag_color,
@@ -68,8 +53,6 @@ export function ViewArchiveModal({
             time: data.time,
             imageUrl: data.image_url || null,
           });
-        } else {
-          console.log("데이터를 찾을 수 없습니다:", currentNodeData.id);
         }
       } catch (error) {
         console.error("Failed to load board data:", error);
@@ -84,7 +67,6 @@ export function ViewArchiveModal({
 
   if (!isOpen || !currentNodeData) return null;
 
-  // 날짜 포맷팅 함수
   const formatDate = (date: Date | null) => {
     if (!date) return "날짜 없음";
     const year = date.getFullYear();
@@ -93,7 +75,6 @@ export function ViewArchiveModal({
     return `${year}년 ${month}월 ${day}일`;
   };
 
-  // 시간 포맷팅 함수
   const formatTime = (date: Date | null) => {
     if (!date) return "시간 없음";
     const hours = String(date.getHours()).padStart(2, "0");
@@ -101,12 +82,10 @@ export function ViewArchiveModal({
     return `${hours}:${minutes}`;
   };
 
-  // date와 time을 합쳐서 Date 객체 생성
   const displayDate = boardData?.date
     ? (() => {
         const dateParts = boardData.date.split("-");
         if (dateParts.length === 3) {
-          // time이 있으면 함께 사용, 없으면 시간은 0으로 설정
           if (boardData.time) {
             const timeParts = boardData.time.split(":");
             if (timeParts.length >= 2) {
@@ -119,7 +98,6 @@ export function ViewArchiveModal({
               );
             }
           }
-          // time이 없으면 날짜만 사용 (시간은 0:00)
           return new Date(
             Number(dateParts[0]),
             Number(dateParts[1]) - 1,
@@ -139,8 +117,7 @@ export function ViewArchiveModal({
     try {
       await deleteBoard(currentNodeData.id);
       setShowDeleteConfirm(false);
-      onClose(); // 모달 닫기
-      // 부모 컴포넌트에서 데이터를 다시 불러오기
+      onClose();
       if (onDelete) {
         onDelete();
       }
@@ -181,7 +158,7 @@ export function ViewArchiveModal({
         <div className="bg-[#F2F0EB] px-4 py-3 flex items-center justify-between border-b border-black">
           <span
             style={{
-              fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+              fontFamily: "'Space Grotesk', sans-serif",
               fontSize: "11px",
               letterSpacing: "0.05em",
               opacity: 0.5,
@@ -194,7 +171,7 @@ export function ViewArchiveModal({
               onClick={onEdit}
               className="border border-black px-3 py-1 hover:bg-black hover:text-[#F2F0EB] transition-colors"
               style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                 fontSize: "11px",
               }}
             >
@@ -204,7 +181,7 @@ export function ViewArchiveModal({
               onClick={() => setShowDeleteConfirm(true)}
               className="border border-red-600 px-3 py-1 hover:bg-red-600 hover:text-white transition-colors text-red-600"
               style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                 fontSize: "11px",
               }}
             >
@@ -220,7 +197,7 @@ export function ViewArchiveModal({
           </div>
         </div>
 
-        {/* Content Area - 읽기 전용 */}
+        {/* Content Area */}
         <div
           className="p-4 overflow-y-auto"
           style={{
@@ -228,12 +205,11 @@ export function ViewArchiveModal({
             maxHeight: "calc(90vh - 60px)",
           }}
         >
-          {/* 로딩 상태 */}
           {isLoading && (
             <div className="mb-4 p-3 text-center">
               <span
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "12px",
                   opacity: 0.5,
                 }}
@@ -243,13 +219,14 @@ export function ViewArchiveModal({
             </div>
           )}
 
-          {/* Tag System - 읽기 전용 */}
+          {/* Tag System */}
           <div className="mb-4">
             <div
               className="flex items-center gap-1.5 mb-2"
               style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                 fontSize: "13px",
+                // opacity 제거 (진하게)
               }}
             >
               <span style={{ color: "#D32F2F" }}>*</span>
@@ -273,8 +250,7 @@ export function ViewArchiveModal({
                     />
                     <span
                       style={{
-                        fontFamily:
-                          "SF Mono, Menlo, Monaco, Consolas, monospace",
+                        fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                         fontSize: "12.5px",
                       }}
                     >
@@ -285,7 +261,7 @@ export function ViewArchiveModal({
               ) : (
                 <span
                   style={{
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                     fontSize: "11px",
                     opacity: 0.5,
                   }}
@@ -300,38 +276,44 @@ export function ViewArchiveModal({
           <div className="grid grid-cols-2 gap-4 mb-4">
             {/* Left Column: Date + Image */}
             <div className="flex flex-col gap-4">
-              {/* Date Display - 단순 텍스트 */}
+              {/* Date Display */}
               <div>
                 <div
                   className="flex items-center gap-1.5 mb-2"
                   style={{
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                     fontSize: "13px",
+                    // opacity 제거 (진하게)
                   }}
                 >
                   <span style={{ color: "#D32F2F" }}>*</span>
                   <span>날짜 선택</span>
                 </div>
                 <div
-                  className="border border-black bg-white p-3 opacity-60"
+                  className="bg-white p-3"
                   style={{
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    border: "1px solid black", // 항상 진한 테두리
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                     fontSize: "12px",
+                    // opacity 제거 (진하게)
+                    height: "42px", // 높이 고정 (정렬 맞춤)
+                    display: "flex",
+                    alignItems: "center",
                   }}
                 >
                   {formatDate(displayDate)}
                 </div>
               </div>
 
-              {/* Image Display - 읽기 전용 */}
+              {/* Image Display */}
               <div className="flex-1">
                 <div
                   style={{
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                     fontSize: "11px",
                     marginBottom: "8px",
-                    opacity: 0.4,
                     color: "#666",
+                    // opacity 제거 (진하게)
                   }}
                 >
                   이미지
@@ -339,8 +321,11 @@ export function ViewArchiveModal({
                 <div
                   className="w-full bg-white flex items-center justify-center relative"
                   style={{
-                    border: "1px solid rgba(0,0,0,0.3)",
-                    height: "342px", // 내용 div와 동일한 높이
+                    // [조건부 테두리] 이미지가 있으면 진하게(black), 없으면 연하게
+                    border: boardData?.imageUrl
+                      ? "1px solid black"
+                      : "1px solid rgba(0,0,0,0.3)",
+                    height: "342px",
                   }}
                 >
                   {boardData?.imageUrl ? (
@@ -349,15 +334,14 @@ export function ViewArchiveModal({
                       alt="Archive"
                       className="w-full h-auto"
                       style={{
-                        maxHeight: "342px", // description div의 높이와 동일
+                        maxHeight: "342px",
                         objectFit: "contain",
                       }}
                     />
                   ) : (
                     <span
                       style={{
-                        fontFamily:
-                          "SF Mono, Menlo, Monaco, Consolas, monospace",
+                        fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                         fontSize: "11px",
                         opacity: 0.3,
                       }}
@@ -371,40 +355,45 @@ export function ViewArchiveModal({
 
             {/* Right Column: Time + Description */}
             <div className="flex flex-col gap-4">
-              {/* Time Display - 단순 텍스트 */}
+              {/* Time Display */}
               <div>
                 <div
                   style={{
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                     fontSize: "11px",
                     marginBottom: "8px",
-                    opacity: 0.4,
                     color: "#666",
+                    // opacity 제거 (진하게)
+                    height: "19px", // 라벨 높이 강제 (좌측과 맞춤)
+                    display: "flex",
+                    alignItems: "center",
                   }}
                 >
                   시간
                 </div>
                 <div
-                  className="bg-white p-3 flex items-center justify-center opacity-60"
+                  className="bg-white p-3 flex items-center justify-center"
                   style={{
-                    border: "1px solid rgba(0,0,0,0.3)",
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    border: "1px solid black", // 항상 진한 테두리
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                     fontSize: "12px",
+                    // opacity 제거 (진하게)
+                    height: "42px", // 높이 고정 (좌측 날짜 박스와 동일)
                   }}
                 >
                   {formatTime(displayDate)}
                 </div>
               </div>
 
-              {/* Description Display - 읽기 전용 */}
+              {/* Description Display */}
               <div className="flex-1 flex flex-col">
                 <div
                   style={{
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                     fontSize: "11px",
                     marginBottom: "8px",
-                    opacity: 0.4,
                     color: "#666",
+                    // opacity 제거 (진하게)
                   }}
                 >
                   내용
@@ -412,17 +401,19 @@ export function ViewArchiveModal({
                 <div
                   className="bg-white relative flex-1"
                   style={{
-                    border: "1px solid rgba(0,0,0,0.3)",
+                    // [조건부 테두리] 내용이 있으면 진하게(black), 없으면 연하게
+                    border: boardData?.description
+                      ? "1px solid black"
+                      : "1px solid rgba(0,0,0,0.3)",
                     height: "342px",
-                    opacity: 0.8,
+                    // opacity 제거 (내용 텍스트 진하게)
                   }}
                 >
                   {boardData?.description ? (
                     <div
                       className="w-full h-full overflow-auto p-3"
                       style={{
-                        fontFamily:
-                          "SF Mono, Menlo, Monaco, Consolas, monospace",
+                        fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                         fontSize: "12px",
                         lineHeight: "1.5",
                         whiteSpace: "pre-wrap",
@@ -434,8 +425,7 @@ export function ViewArchiveModal({
                     <div
                       className="text-gray-400 p-3"
                       style={{
-                        fontFamily:
-                          "SF Mono, Menlo, Monaco, Consolas, monospace",
+                        fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                         fontSize: "12px",
                       }}
                     >
@@ -469,7 +459,7 @@ export function ViewArchiveModal({
             <div className="mb-4">
               <span
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "14px",
                 }}
               >
@@ -482,7 +472,7 @@ export function ViewArchiveModal({
                 disabled={isDeleting}
                 className="border border-black px-4 py-2 hover:bg-black hover:text-[#F2F0EB] transition-colors bg-white"
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "12px",
                 }}
               >
@@ -493,7 +483,7 @@ export function ViewArchiveModal({
                 disabled={isDeleting}
                 className="border border-red-600 px-4 py-2 hover:bg-red-600 hover:text-white transition-colors text-red-600 bg-white disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "12px",
                 }}
               >

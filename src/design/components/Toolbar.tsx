@@ -1,17 +1,48 @@
 import { Search, Calendar, Plus } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 interface ToolbarProps {
   onNewArchive: () => void;
   onDateSelect: (date: Date) => void;
   onSearch: () => void;
+  // [수정] 데이터의 최소/최대 연도를 props로 받음
+  minYear: number;
+  maxYear: number;
 }
 
-export function Toolbar({ onNewArchive, onDateSelect, onSearch }: ToolbarProps) {
+export function Toolbar({ 
+  onNewArchive, 
+  onDateSelect, 
+  onSearch, 
+  minYear, 
+  maxYear 
+}: ToolbarProps) {
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [selectedYear, setSelectedYear] = useState(2024);
-  const [selectedMonth, setSelectedMonth] = useState(10); // October
-  const [selectedDay, setSelectedDay] = useState(1);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedDay, setSelectedDay] = useState(new Date().getDate());
+
+  // [수정] minYear부터 maxYear까지의 연도 배열 생성
+  const years = useMemo(() => {
+    const arr = [];
+    // 데이터가 없어서 minYear가 maxYear보다 클 경우에 대한 안전장치
+    const start = Math.min(minYear, maxYear);
+    const end = Math.max(minYear, maxYear);
+    
+    for (let y = start; y <= end; y++) {
+      arr.push(y);
+    }
+    // 최신 연도가 위로 오게 하려면 .reverse() 추가, 과거순이면 그대로
+    return arr.sort((a, b) => b - a); 
+  }, [minYear, maxYear]);
+
+  // 팝업 열릴 때, 선택된 연도가 범위 밖에 있으면 범위 내로 보정
+  useEffect(() => {
+    if (showDatePicker) {
+      if (selectedYear < minYear) setSelectedYear(minYear);
+      if (selectedYear > maxYear) setSelectedYear(maxYear);
+    }
+  }, [showDatePicker, minYear, maxYear]);
 
   const handleDateConfirm = () => {
     const date = new Date(selectedYear, selectedMonth - 1, selectedDay);
@@ -23,11 +54,9 @@ export function Toolbar({ onNewArchive, onDateSelect, onSearch }: ToolbarProps) 
     <div className="relative">
       <div 
         className="bg-[#F2F0EB] border-black flex flex-row items-center gap-0"
-        style={{
-          borderWidth: '1px',
-        }}
+        style={{ borderWidth: '1px' }}
       >
-        {/* Calendar Button - Opens Date Picker */}
+        {/* Calendar Button */}
         <button 
           onClick={() => setShowDatePicker(!showDatePicker)}
           className="border-black bg-[#F2F0EB] hover:bg-black hover:text-[#F2F0EB] transition-colors"
@@ -46,7 +75,7 @@ export function Toolbar({ onNewArchive, onDateSelect, onSearch }: ToolbarProps) 
           <Calendar style={{ width: '24px', height: '24px' }} strokeWidth={1.5} />
         </button>
 
-        {/* Plus Button - Opens Archive Modal */}
+        {/* Plus Button */}
         <button 
           onClick={onNewArchive}
           className="border-black bg-[#F2F0EB] hover:bg-black hover:text-[#F2F0EB] transition-colors"
@@ -87,7 +116,6 @@ export function Toolbar({ onNewArchive, onDateSelect, onSearch }: ToolbarProps) 
       {/* Date Picker Popup */}
       {showDatePicker && (
         <>
-          {/* Backdrop to close date picker when clicking outside */}
           <div 
             className="fixed inset-0 z-40" 
             onClick={() => setShowDatePicker(false)}
@@ -98,37 +126,39 @@ export function Toolbar({ onNewArchive, onDateSelect, onSearch }: ToolbarProps) 
             style={{ width: '200px' }}
           >
             <div className="mb-3">
-              <span className="block mb-1" style={{ fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace', fontSize: '12px', fontWeight: 'bold' }}>
+              <span className="block mb-1" style={{ fontFamily: "'IBM Plex Mono', 'Pretendard', monospace", fontSize: '12px', fontWeight: 'bold' }}>
                 날짜 선택
               </span>
             </div>
 
-            {/* Year */}
+            {/* Year Selector */}
             <div className="mb-3">
-              <label className="block mb-1" style={{ fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace', fontSize: '10px' }}>
+              <label className="block mb-1" style={{ fontFamily: "'IBM Plex Mono', 'Pretendard', monospace", fontSize: '10px' }}>
                 년도
               </label>
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
                 className="w-full border border-black bg-[#F2F0EB] px-2 py-1"
-                style={{ fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace', fontSize: '11px' }}
+                style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '11px' }}
               >
-                <option value={2024}>2024</option>
-                <option value={2025}>2025</option>
+                {/* [수정] 동적으로 생성된 연도 옵션 렌더링 */}
+                {years.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
               </select>
             </div>
 
-            {/* Month */}
+            {/* Month Selector */}
             <div className="mb-3">
-              <label className="block mb-1" style={{ fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace', fontSize: '10px' }}>
+              <label className="block mb-1" style={{ fontFamily: "'IBM Plex Mono', 'Pretendard', monospace", fontSize: '10px' }}>
                 월
               </label>
               <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(Number(e.target.value))}
                 className="w-full border border-black bg-[#F2F0EB] px-2 py-1"
-                style={{ fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace', fontSize: '11px' }}
+                style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '11px' }}
               >
                 {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
                   <option key={month} value={month}>{month}</option>
@@ -136,16 +166,16 @@ export function Toolbar({ onNewArchive, onDateSelect, onSearch }: ToolbarProps) 
               </select>
             </div>
 
-            {/* Day */}
+            {/* Day Selector */}
             <div className="mb-3">
-              <label className="block mb-1" style={{ fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace', fontSize: '10px' }}>
+              <label className="block mb-1" style={{ fontFamily: "'IBM Plex Mono', 'Pretendard', monospace", fontSize: '10px' }}>
                 일
               </label>
               <select
                 value={selectedDay}
                 onChange={(e) => setSelectedDay(Number(e.target.value))}
                 className="w-full border border-black bg-[#F2F0EB] px-2 py-1"
-                style={{ fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace', fontSize: '11px' }}
+                style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '11px' }}
               >
                 {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
                   <option key={day} value={day}>{day}</option>
@@ -158,14 +188,14 @@ export function Toolbar({ onNewArchive, onDateSelect, onSearch }: ToolbarProps) 
               <button
                 onClick={handleDateConfirm}
                 className="flex-1 border border-black bg-black text-[#F2F0EB] px-3 py-1 hover:bg-[#F2F0EB] hover:text-black transition-colors"
-                style={{ fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace', fontSize: '11px' }}
+                style={{ fontFamily: "'IBM Plex Mono', 'Pretendard', monospace", fontSize: '11px' }}
               >
                 이동
               </button>
               <button
                 onClick={() => setShowDatePicker(false)}
                 className="flex-1 border border-black bg-[#F2F0EB] px-3 py-1 hover:bg-black hover:text-[#F2F0EB] transition-colors"
-                style={{ fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace', fontSize: '11px' }}
+                style={{ fontFamily: "'IBM Plex Mono', 'Pretendard', monospace", fontSize: '11px' }}
               >
                 취소
               </button>

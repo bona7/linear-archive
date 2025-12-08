@@ -97,7 +97,9 @@ export function AnalysisPanel({
             <Sparkles size={14} strokeWidth={1.5} />
             <span
               style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                // [제목 규칙] Space Grotesk + Pretendard
+                fontFamily: "'Space Grotesk', 'Pretendard', sans-serif",
+                fontWeight: "bold",
                 fontSize: "11px",
                 letterSpacing: "0.05em",
               }}
@@ -126,7 +128,8 @@ export function AnalysisPanel({
               </div>
               <span
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  // [UI 규칙] IBM Plex Mono + Pretendard
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "12px",
                 }}
               >
@@ -142,7 +145,8 @@ export function AnalysisPanel({
                   <TrendingUp size={14} strokeWidth={1.5} />
                   <span
                     style={{
-                      fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                      // [UI 규칙] IBM Plex Mono + Pretendard
+                      fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                       fontSize: "11px",
                       letterSpacing: "0.05em",
                     }}
@@ -153,7 +157,8 @@ export function AnalysisPanel({
                 <div
                   className="border border-black bg-white p-3"
                   style={{
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    // [본문 규칙] IBM Plex Mono + Pretendard
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                     fontSize: "13px",
                     lineHeight: "1.6",
                   }}
@@ -168,7 +173,8 @@ export function AnalysisPanel({
                   <BarChart3 size={14} strokeWidth={1.5} />
                   <span
                     style={{
-                      fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                      // [UI 규칙] IBM Plex Mono + Pretendard
+                      fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                       fontSize: "11px",
                       letterSpacing: "0.05em",
                     }}
@@ -179,7 +185,8 @@ export function AnalysisPanel({
                 <div
                   className="border border-black bg-white p-3"
                   style={{
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    // [본문 규칙] IBM Plex Mono + Pretendard
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                     fontSize: "13px",
                     lineHeight: "1.6",
                   }}
@@ -193,7 +200,8 @@ export function AnalysisPanel({
                 <div className="border-b border-black pb-1 mb-2">
                   <span
                     style={{
-                      fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                      // [UI 규칙] IBM Plex Mono + Pretendard
+                      fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                       fontSize: "11px",
                       letterSpacing: "0.05em",
                     }}
@@ -204,7 +212,8 @@ export function AnalysisPanel({
                 <div
                   className="border border-black bg-[#F2F0EB] p-3"
                   style={{
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    // [본문 규칙] IBM Plex Mono + Pretendard
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                     fontSize: "13px",
                     lineHeight: "1.6",
                   }}
@@ -227,7 +236,8 @@ export function AnalysisPanel({
               >
                 <span
                   style={{
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    // [UI 규칙] IBM Plex Mono + Pretendard
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                     fontSize: "13px",
                     letterSpacing: "0.05em",
                   }}
@@ -244,7 +254,8 @@ export function AnalysisPanel({
               </div>
               <span
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  // [UI 규칙] IBM Plex Mono + Pretendard
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "12px",
                 }}
               >
@@ -263,7 +274,8 @@ export function AnalysisPanel({
               >
                 <span
                   style={{
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    // [UI 규칙] IBM Plex Mono + Pretendard
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                     fontSize: "12px",
                     letterSpacing: "0.05em",
                   }}

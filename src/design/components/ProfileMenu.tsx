@@ -28,8 +28,9 @@ export function ProfileMenu({ onLogout, userNickname }: ProfileMenuProps) {
         <span
           className="whitespace-nowrap"
           style={{
-            fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+            fontFamily: "Space Grotesk, 'Pretendard', serif",
             fontSize: "14px",
+            fontWeight: "bold",
           }}
         >
           {userNickname}
@@ -64,7 +65,8 @@ export function ProfileMenu({ onLogout, userNickname }: ProfileMenuProps) {
               />
               <span
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  // [UI 규칙] IBM Plex Mono + Pretendard
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "13px",
                 }}
               >
@@ -89,7 +91,8 @@ export function ProfileMenu({ onLogout, userNickname }: ProfileMenuProps) {
               />
               <span
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  // [UI 규칙] IBM Plex Mono + Pretendard
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "13px",
                 }}
               >
