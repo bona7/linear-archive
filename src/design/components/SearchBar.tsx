@@ -30,17 +30,22 @@ export function SearchBar({ onSearch, onClose, matchCount }: SearchBarProps) {
           onChange={(e) => handleSearch(e.target.value)}
           placeholder="아카이브 검색..."
           className="flex-1 border-2 border-black bg-[#F2F0EB] px-4 py-3"
-          style={{ 
-            fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace', 
-            fontSize: '14px',
-            outline: 'none'
+          style={{
+            // [UI/입력 규칙] IBM Plex Mono + Pretendard
+            fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
+            fontSize: "14px",
+            outline: "none",
           }}
           autoFocus
         />
         <button
           onClick={handleClear}
           className="border-2 border-black bg-[#F2F0EB] px-4 hover:bg-black hover:text-[#F2F0EB] transition-colors"
-          style={{ fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace', fontSize: '12px' }}
+          style={{
+            // [UI 규칙] IBM Plex Mono + Pretendard
+            fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
+            fontSize: "12px",
+          }}
         >
           지우기
         </button>
@@ -56,8 +61,14 @@ export function SearchBar({ onSearch, onClose, matchCount }: SearchBarProps) {
       {/* Results Info */}
       {query && (
         <div className="border border-black bg-[#F2F0EB] px-3 py-2 inline-block">
-          <span style={{ fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace', fontSize: '12px' }}>
-            {matchCount === 0 ? '일치 없음' : `${matchCount}건 일치`}
+          <span
+            style={{
+              // [데이터 규칙] JetBrains Mono (숫자용) + Pretendard (한글용)
+              fontFamily: "'JetBrains Mono', 'Pretendard', monospace",
+              fontSize: "12px",
+            }}
+          >
+            {matchCount === 0 ? "일치 없음" : `${matchCount}건 일치`}
           </span>
         </div>
       )}

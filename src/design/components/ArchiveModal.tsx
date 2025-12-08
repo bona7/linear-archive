@@ -394,7 +394,8 @@ export function ArchiveModal({
         <div className="bg-[#F2F0EB] px-4 py-3 flex items-center justify-between border-b border-black">
           <span
             style={{
-              fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+              // [제목 규칙] Space Grotesk
+              fontFamily: "'Space Grotesk', sans-serif",
               fontSize: "11px",
               letterSpacing: "0.05em",
               opacity: 0.5,
@@ -429,7 +430,8 @@ export function ArchiveModal({
             >
               <span
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  // [UI 규칙] IBM Plex Mono + Pretendard
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "12px",
                   opacity: 0.5,
                 }}
@@ -444,7 +446,8 @@ export function ArchiveModal({
                 <div
                   className="flex items-center gap-1.5 mb-2"
                   style={{
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    // [UI 규칙] IBM Plex Mono + Pretendard
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                     fontSize: "13px",
                   }}
                 >
@@ -475,8 +478,9 @@ export function ArchiveModal({
                         />
                         <span
                           style={{
+                            // [UI 규칙] IBM Plex Mono + Pretendard
                             fontFamily:
-                              "SF Mono, Menlo, Monaco, Consolas, monospace",
+                              "'IBM Plex Mono', 'Pretendard', monospace",
                             fontSize: "12.5px",
                           }}
                         >
@@ -489,8 +493,9 @@ export function ArchiveModal({
                     {isLoadingTags ? (
                       <span
                         style={{
+                          // [UI 규칙] IBM Plex Mono + Pretendard
                           fontFamily:
-                            "SF Mono, Menlo, Monaco, Consolas, monospace",
+                            "'IBM Plex Mono', 'Pretendard', monospace",
                           fontSize: "11px",
                           opacity: 0.5,
                         }}
@@ -508,8 +513,9 @@ export function ArchiveModal({
                           ? selectedTags.length === 0 && (
                               <span
                                 style={{
+                                  // [UI 규칙] IBM Plex Mono + Pretendard
                                   fontFamily:
-                                    "SF Mono, Menlo, Monaco, Consolas, monospace",
+                                    "'IBM Plex Mono', 'Pretendard', monospace",
                                   fontSize: "11px",
                                   opacity: 0.5,
                                 }}
@@ -533,8 +539,9 @@ export function ArchiveModal({
                                 />
                                 <span
                                   style={{
+                                    // [UI 규칙] IBM Plex Mono + Pretendard
                                     fontFamily:
-                                      "SF Mono, Menlo, Monaco, Consolas, monospace",
+                                      "'IBM Plex Mono', 'Pretendard', monospace",
                                     fontSize: "11px",
                                   }}
                                 >
@@ -554,8 +561,8 @@ export function ArchiveModal({
                   >
                     <span
                       style={{
-                        fontFamily:
-                          "SF Mono, Menlo, Monaco, Consolas, monospace",
+                        // [UI 규칙] IBM Plex Mono + Pretendard
+                        fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                         fontSize: "12px",
                         lineHeight: "1",
                       }}
@@ -607,8 +614,8 @@ export function ArchiveModal({
                     <div
                       className="flex items-center gap-1.5 mb-2"
                       style={{
-                        fontFamily:
-                          "SF Mono, Menlo, Monaco, Consolas, monospace",
+                        // [UI 규칙] IBM Plex Mono + Pretendard
+                        fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                         fontSize: "13px",
                       }}
                     >
@@ -638,8 +645,8 @@ export function ArchiveModal({
                           }}
                           className="flex-1 border border-black bg-white px-1 py-0.5 outline-none "
                           style={{
-                            fontFamily:
-                              "SF Mono, Menlo, Monaco, Consolas, monospace",
+                            // [데이터/숫자 규칙] JetBrains Mono
+                            fontFamily: "'JetBrains Mono', monospace",
                             fontSize: "11px",
                           }}
                           size={1}
@@ -670,8 +677,8 @@ export function ArchiveModal({
                           }}
                           className="flex-1 border border-black bg-white px-1 py-0.5 outline-none"
                           style={{
-                            fontFamily:
-                              "SF Mono, Menlo, Monaco, Consolas, monospace",
+                            // [데이터/숫자 규칙] JetBrains Mono
+                            fontFamily: "'JetBrains Mono', monospace",
                             fontSize: "11px",
                           }}
                           size={1}
@@ -691,8 +698,9 @@ export function ArchiveModal({
                             key={day}
                             className="text-center py-0.5 border border-black bg-[#F2F0EB]"
                             style={{
+                              // [UI 규칙] IBM Plex Mono + Pretendard
                               fontFamily:
-                                "SF Mono, Menlo, Monaco, Consolas, monospace",
+                                "'IBM Plex Mono', 'Pretendard', monospace",
                               fontSize: "9px",
                             }}
                           >
@@ -716,8 +724,8 @@ export function ArchiveModal({
                                 : "bg-white hover:bg-[#F2F0EB]"
                             }`}
                             style={{
-                              fontFamily:
-                                "SF Mono, Menlo, Monaco, Consolas, monospace",
+                              // [데이터/숫자 규칙] JetBrains Mono
+                              fontFamily: "'JetBrains Mono', monospace",
                               fontSize: "10px",
                               backgroundColor:
                                 selectedDay === day ? "#3A3834" : undefined,
@@ -735,8 +743,8 @@ export function ArchiveModal({
                   <div>
                     <div
                       style={{
-                        fontFamily:
-                          "SF Mono, Menlo, Monaco, Consolas, monospace",
+                        // [UI 규칙] IBM Plex Mono + Pretendard
+                        fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                         fontSize: "11px",
                         marginBottom: "8px",
                         opacity: 0.4,
@@ -809,8 +817,8 @@ export function ArchiveModal({
                   <div>
                     <div
                       style={{
-                        fontFamily:
-                          "SF Mono, Menlo, Monaco, Consolas, monospace",
+                        // [UI 규칙] IBM Plex Mono + Pretendard
+                        fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                         fontSize: "11px",
                         marginBottom: "8px",
                         opacity: 0.4,
@@ -827,13 +835,11 @@ export function ArchiveModal({
                     >
                       <select
                         value={selectedHour}
-                        onChange={(e) =>
-                          setSelectedHour(Number(e.target.value))
-                        }
+                        onChange={(e) => setSelectedHour(Number(e.target.value))}
                         className="bg-white px-2 py-1 outline-none"
                         style={{
-                          fontFamily:
-                            "SF Mono, Menlo, Monaco, Consolas, monospace",
+                          // [데이터/숫자 규칙] JetBrains Mono
+                          fontFamily: "'JetBrains Mono', monospace",
                           fontSize: "12px",
                           border: "1px solid rgba(0,0,0,0.3)",
                         }}
@@ -846,8 +852,8 @@ export function ArchiveModal({
                       </select>
                       <span
                         style={{
-                          fontFamily:
-                            "SF Mono, Menlo, Monaco, Consolas, monospace",
+                          // [데이터/숫자 규칙] JetBrains Mono
+                          fontFamily: "'JetBrains Mono', monospace",
                           fontSize: "14px",
                           opacity: 0.3,
                         }}
@@ -861,8 +867,8 @@ export function ArchiveModal({
                         }
                         className="bg-white px-2 py-1 outline-none"
                         style={{
-                          fontFamily:
-                            "SF Mono, Menlo, Monaco, Consolas, monospace",
+                          // [데이터/숫자 규칙] JetBrains Mono
+                          fontFamily: "'JetBrains Mono', monospace",
                           fontSize: "12px",
                           border: "1px solid rgba(0,0,0,0.3)",
                         }}
@@ -884,8 +890,9 @@ export function ArchiveModal({
                     <div className="flex items-center mb-2">
                       <div
                         style={{
+                          // [UI 규칙] IBM Plex Mono + Pretendard
                           fontFamily:
-                            "SF Mono, Menlo, Monaco, Consolas, monospace",
+                            "'IBM Plex Mono', 'Pretendard', monospace",
                           fontSize: "11px",
                           opacity: 0.4,
                           color: "#666",
@@ -907,8 +914,9 @@ export function ArchiveModal({
                         onChange={(e) => setDescription(e.target.value)}
                         className="w-full h-full bg-transparent outline-none resize-none"
                         style={{
+                          // [본문 규칙] IBM Plex Mono + Pretendard
                           fontFamily:
-                            "SF Mono, Menlo, Monaco, Consolas, monospace",
+                            "'IBM Plex Mono', 'Pretendard', monospace",
                           fontSize: "12px",
                           lineHeight: "1.5",
                         }}
@@ -923,7 +931,8 @@ export function ArchiveModal({
                 <div className="mb-4 p-3 bg-red-50 border border-red-300 rounded">
                   <span
                     style={{
-                      fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                      // [UI 규칙] IBM Plex Mono + Pretendard
+                      fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                       fontSize: "12px",
                       color: "#D32F2F",
                     }}
@@ -955,7 +964,8 @@ export function ArchiveModal({
                 >
                   <span
                     style={{
-                      fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                      // [UI 규칙] IBM Plex Mono + Pretendard
+                      fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                       fontSize: "13px",
                       letterSpacing: "0.05em",
                     }}
