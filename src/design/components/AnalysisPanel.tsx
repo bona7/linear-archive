@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ChevronRight,
   ChevronLeft,
@@ -8,10 +8,6 @@ import {
 } from "lucide-react";
 import { BoardWithTags } from "@/commons/libs/supabase/db";
 import { fetchAnalysis } from "@/components/commons/units/AnalysisCall/AnalysisCall.index";
-import {
-  getLocalStorageItem,
-  setLocalStorageItem,
-} from "@/commons/libraries/localStorageUtils";
 
 interface AnalysisData {
   fact1: string;
@@ -46,32 +42,6 @@ export function AnalysisPanel({
   const [isLoading, setIsLoading] = useState(false);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
 
-  useEffect(() => {
-    const loadCachedAnalysis = async () => {
-      const cachedItem = getLocalStorageItem<AnalysisData>("analysisData");
-      if (cachedItem) {
-        setAnalysisData(cachedItem);
-        setIsLoading(false);
-        return;
-      } else {
-        // if no cached data, fetch new analysis
-        try {
-          const data = await fetchAnalysis(boards);
-          if (data) {
-            setAnalysisData(data);
-            setLocalStorageItem<AnalysisData>("analysisData", data);
-          }
-        } catch (error) {
-          console.error("Failed to get analysis:", error);
-          // Optionally, set an error state to show in the UI
-        } finally {
-          setIsLoading(false);
-        }
-      }
-    };
-    loadCachedAnalysis();
-  }, []);
-
   const handleAnalyze = async () => {
     setIsLoading(true);
     setAnalysisData(null); // Clear previous analysis
@@ -80,13 +50,13 @@ export function AnalysisPanel({
       const data = await fetchAnalysis(boards);
       if (data) {
         setAnalysisData(data);
-        setLocalStorageItem<AnalysisData>("analysisData", data);
       }
     } catch (error) {
       console.error("Failed to get analysis:", error);
       // Optionally, set an error state to show in the UI
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   return (
