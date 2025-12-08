@@ -155,22 +155,11 @@ export function LoginModal({
         >
           {/* Title */}
           <div className="mb-8">
-            {/* <div className="text-center mb-6">
-              <div
-                style={{
-                  fontFamily: "Georgia, serif",
-                  fontSize: "36px",
-                  lineHeight: "40px",
-                }}
-              >
-                <p style={{ margin: 0 }}>LINEAR</p>
-                <p style={{ margin: 0 }}>ARCHIVE</p>
-              </div>
-            </div> */}
             <p
               className="text-center mb-6"
               style={{
-                fontFamily: "Georgia, serif",
+                // [수정] 제목 규칙: Space Grotesk
+                fontFamily: "'Space Grotesk', sans-serif",
                 fontSize: "20px",
                 fontWeight: "bold",
               }}
@@ -185,7 +174,7 @@ export function LoginModal({
             <div className="mb-6 p-3 bg-red-50 border border-red-300 rounded">
               <span
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "12px",
                   color: "#D32F2F",
                 }}
@@ -203,7 +192,7 @@ export function LoginModal({
                 htmlFor="signUpEmail"
                 className="block mb-2"
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "12px",
                   fontWeight: "bold",
                 }}
@@ -217,7 +206,7 @@ export function LoginModal({
                 onChange={(e) => setSignUpEmail(e.target.value)}
                 className="w-full border-2 border-black bg-[#F2F0EB] px-4 py-3 focus:outline-none focus:border-black"
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "14px",
                 }}
                 placeholder="이메일을 입력하세요"
@@ -231,7 +220,7 @@ export function LoginModal({
                 htmlFor="signUpPassword"
                 className="block mb-2"
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "12px",
                   fontWeight: "bold",
                 }}
@@ -245,7 +234,7 @@ export function LoginModal({
                 onChange={(e) => setSignUpPassword(e.target.value)}
                 className="w-full border-2 border-black bg-[#F2F0EB] px-4 py-3 focus:outline-none focus:border-black"
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "14px",
                 }}
                 placeholder="비밀번호를 입력하세요"
@@ -259,7 +248,7 @@ export function LoginModal({
                 htmlFor="confirmPassword"
                 className="block mb-2"
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "12px",
                   fontWeight: "bold",
                 }}
@@ -273,7 +262,7 @@ export function LoginModal({
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full border-2 border-black bg-[#F2F0EB] px-4 py-3 focus:outline-none focus:border-black"
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "14px",
                 }}
                 placeholder="비밀번호를 재입력하세요"
@@ -282,7 +271,7 @@ export function LoginModal({
               {passwordsMatch && (
                 <p
                   style={{
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                     fontSize: "11px",
                     opacity: 0.5,
                     marginTop: "4px",
@@ -294,7 +283,7 @@ export function LoginModal({
               {passwordsDontMatch && (
                 <p
                   style={{
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                     fontSize: "11px",
                     opacity: 0.5,
                     marginTop: "4px",
@@ -311,7 +300,7 @@ export function LoginModal({
                 htmlFor="signUpNickname"
                 className="block mb-2"
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "12px",
                   fontWeight: "bold",
                 }}
@@ -325,7 +314,7 @@ export function LoginModal({
                 onChange={(e) => setNickname(e.target.value)}
                 className="w-full border-2 border-black bg-[#F2F0EB] px-4 py-3 focus:outline-none focus:border-black"
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "14px",
                 }}
                 placeholder="화면에 표시할 닉네임을 입력하세요"
@@ -340,7 +329,7 @@ export function LoginModal({
                 disabled={isLoading || !nickname.trim()}
                 className="w-full border-2 border-black bg-black text-[#F2F0EB] px-6 py-3 hover:bg-[#F2F0EB] hover:text-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "15px",
                   fontWeight: "bold",
                 }}
@@ -353,7 +342,7 @@ export function LoginModal({
                 onClick={handleToggleMode}
                 className="w-full border-2 border-black bg-[#F2F0EB] text-black px-6 py-3 hover:bg-black hover:text-[#F2F0EB] transition-colors"
                 style={{
-                  fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                  fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                   fontSize: "15px",
                 }}
               >
@@ -401,9 +390,11 @@ export function LoginModal({
             <div className="text-center mb-6">
               <div
                 style={{
-                  fontFamily: "Georgia, serif",
+                  // [수정] 제목 규칙: Space Grotesk (LINEAR ARCHIVE)
+                  fontFamily: "'Space Grotesk', sans-serif",
                   fontSize: "36px",
                   lineHeight: "40px",
+                  fontWeight: "bold",
                 }}
               >
                 <p style={{ margin: 0 }}>LINEAR</p>
@@ -418,7 +409,7 @@ export function LoginModal({
             <p
               className="text-center"
               style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                 fontSize: "18px",
                 fontWeight: "bold",
                 lineHeight: "1.6",
@@ -469,9 +460,11 @@ export function LoginModal({
             <div className="text-center mb-6">
               <div
                 style={{
-                  fontFamily: "Georgia, serif",
+                  // [수정] 제목 규칙: Space Grotesk
+                  fontFamily: "'Space Grotesk', sans-serif",
                   fontSize: "36px",
                   lineHeight: "40px",
+                  fontWeight: "bold",
                 }}
               >
                 <p style={{ margin: 0 }}>LINEAR</p>
@@ -486,7 +479,7 @@ export function LoginModal({
             <p
               className="text-center mb-8"
               style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                 fontSize: "20px",
                 fontWeight: "bold",
                 lineHeight: "1.5",
@@ -497,7 +490,7 @@ export function LoginModal({
             <p
               className="text-center mb-0"
               style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                 fontSize: "13px",
                 fontWeight: "bold",
               }}
@@ -512,7 +505,7 @@ export function LoginModal({
             onClick={handleFinalLogin}
             className="w-full border-2 border-black bg-black text-[#F2F0EB] px-6 py-3 hover:bg-[#F2F0EB] hover:text-black transition-colors"
             style={{
-              fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+              fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
               fontSize: "15px",
               fontWeight: "bold",
             }}
@@ -555,7 +548,13 @@ export function LoginModal({
       >
         {/* Title */}
         <div className="mb-8 text-center">
-          <h2 style={{ fontFamily: "Georgia, serif", fontSize: "48px" }}>
+          <h2
+            style={{
+              fontFamily: "Space Grotesk, sans-serif",
+              fontSize: "48px",
+              fontWeight: "bold",
+            }}
+          >
             로그인
           </h2>
           <div className="w-full h-0.5 bg-black mt-4" />
@@ -566,7 +565,7 @@ export function LoginModal({
           <div className="mb-6 p-3 bg-red-50 border border-red-300 rounded">
             <span
               style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                 fontSize: "12px",
                 color: "#D32F2F",
               }}
@@ -584,7 +583,7 @@ export function LoginModal({
               htmlFor="loginEmail"
               className="block mb-2"
               style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                 fontSize: "12px",
                 fontWeight: "bold",
               }}
@@ -598,7 +597,7 @@ export function LoginModal({
               onChange={(e) => setLoginEmail(e.target.value)}
               className="w-full border-2 border-black bg-[#F2F0EB] px-4 py-3 focus:outline-none focus:border-black"
               style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                 fontSize: "14px",
               }}
               placeholder="이메일 입력"
@@ -612,7 +611,7 @@ export function LoginModal({
               htmlFor="loginPassword"
               className="block mb-2"
               style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                 fontSize: "12px",
                 fontWeight: "bold",
               }}
@@ -626,7 +625,7 @@ export function LoginModal({
               onChange={(e) => setLoginPassword(e.target.value)}
               className="w-full border-2 border-black bg-[#F2F0EB] px-4 py-3 focus:outline-none focus:border-black"
               style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                 fontSize: "14px",
               }}
               placeholder="비밀번호 입력"
@@ -641,7 +640,7 @@ export function LoginModal({
               disabled={isLoading}
               className="w-full border-2 border-black bg-black text-[#F2F0EB] px-6 py-3 hover:bg-[#F2F0EB] hover:text-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                 fontSize: "14px",
                 fontWeight: "bold",
               }}
@@ -654,7 +653,7 @@ export function LoginModal({
               onClick={handleToggleMode}
               className="w-full border-2 border-black bg-[#F2F0EB] text-black px-6 py-3 hover:bg-black hover:text-[#F2F0EB] transition-colors"
               style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                 fontSize: "12px",
               }}
             >

@@ -103,7 +103,8 @@ export function TagCreator({
       <div className="bg-[#F2F0EB] px-4 py-3 border-b border-black flex-shrink-0">
         <span
           style={{
-            fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+            // [UI 규칙] IBM Plex Mono + Pretendard
+            fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
             fontSize: "11px",
             letterSpacing: "0.05em",
             opacity: 0.5,
@@ -120,7 +121,8 @@ export function TagCreator({
             <div
               className="border-b border-black pb-1 flex-1"
               style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                // [UI 규칙] IBM Plex Mono + Pretendard
+                fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                 fontSize: "12px",
               }}
             >
@@ -136,7 +138,8 @@ export function TagCreator({
             placeholder="태그 이름을 입력하세요"
             className="w-full border border-black px-3 py-2 bg-white outline-none focus:ring-0"
             style={{
-              fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+              // [UI 규칙] IBM Plex Mono + Pretendard
+              fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
               fontSize: "13px",
             }}
           />
@@ -148,7 +151,8 @@ export function TagCreator({
             <div
               className="border-b border-black pb-1 flex-1"
               style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                // [UI 규칙] IBM Plex Mono + Pretendard
+                fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                 fontSize: "12px",
               }}
             >
@@ -158,7 +162,8 @@ export function TagCreator({
               onClick={() => setShowColorPicker(!showColorPicker)}
               className="border border-black px-2 py-0.5 bg-white hover:bg-[#E5E5E5] transition-colors ml-2"
               style={{
-                fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                // [UI 규칙] IBM Plex Mono + Pretendard
+                fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                 fontSize: "10px",
               }}
             >
@@ -184,7 +189,8 @@ export function TagCreator({
                     style={{
                       color: "#F2F0EB",
                       fontSize: "12px",
-                      fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                      // [UI 규칙] IBM Plex Mono + Pretendard
+                      fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                       textShadow: "0 0 2px rgba(0,0,0,0.5)",
                     }}
                   >
@@ -211,7 +217,8 @@ export function TagCreator({
                   onChange={(e) => setSelectedColor(e.target.value)}
                   className="flex-1 border border-black px-2 py-1 bg-white outline-none"
                   style={{
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    // [UI 규칙] IBM Plex Mono + Pretendard
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                     fontSize: "11px",
                   }}
                   placeholder="#RRGGBB"
@@ -225,7 +232,8 @@ export function TagCreator({
         <div className="flex items-center gap-2 px-3 py-2 border border-black bg-white">
           <span
             style={{
-              fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+              // [UI 규칙] IBM Plex Mono + Pretendard
+              fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
               fontSize: "10px",
               opacity: 0.6,
             }}
@@ -238,7 +246,8 @@ export function TagCreator({
           />
           <span
             style={{
-              fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+              // [UI 규칙] IBM Plex Mono + Pretendard
+              fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
               fontSize: "11px",
             }}
           >
@@ -265,7 +274,8 @@ export function TagCreator({
         >
           <span
             style={{
-              fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+              // [UI 규칙] IBM Plex Mono + Pretendard
+              fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
               fontSize: "13px",
               letterSpacing: "0.05em",
             }}
