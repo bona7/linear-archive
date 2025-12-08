@@ -1,11 +1,17 @@
 import { Timeline } from "./components/Timeline";
 import { Toolbar } from "./components/Toolbar";
 import { ArchiveModal } from "./components/ArchiveModal";
+import { ViewArchiveModal } from "./components/ViewArchiveModal";
 import { SearchBar } from "./components/SearchBar";
 import { LoginModal } from "./components/LoginModal";
 import { ProfileMenu } from "./components/ProfileMenu";
-import { useState, useRef } from "react";
-import nodeItems from "./data/nodeItems";
+import { useState, useRef, useEffect } from "react";
+import { readBoardsWithTags } from "../commons/libs/supabase/db";
+import {
+  getSession,
+  getDisplayName,
+  signOut,
+} from "../commons/libs/supabase/auth";
 
 interface NodeTag {
   name: string;
@@ -13,7 +19,7 @@ interface NodeTag {
 }
 
 interface NodeData {
-  id: number;
+  id: string;
   tag?: NodeTag;
   title?: string;
   description?: string;
@@ -22,102 +28,223 @@ interface NodeData {
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [modalPosition, setModalPosition] = useState<{
     x: number;
     y: number;
   } | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [userNickname, setUserNickname] = useState("Guest"); // User nickname (different from email)
-  const [nodeDataMap, setNodeDataMap] =
-    useState<Record<number, NodeData>>(nodeItems);
+  const [nodeDataMap, setNodeDataMap] = useState<Record<string, NodeData>>({});
   const [recentTags, setRecentTags] = useState<NodeTag[]>([
     { name: "가나디", color: "#FF69B4" },
     { name: "라멘", color: "#FF6B8A" },
     { name: "자동차", color: "#3B82F6" },
   ]);
-  const [nextNodeId, setNextNodeId] = useState(31); // Continue from existing nodes
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [matchedNodeIds, setMatchedNodeIds] = useState<Set<number>>(new Set());
+  const [matchedNodeIds, setMatchedNodeIds] = useState<Set<string>>(new Set());
   const timelineRef = useRef<{ scrollToDate: (date: Date) => void }>(null);
+  const [isLoadingBoards, setIsLoadingBoards] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true); // 인증 확인 중 상태
+
+  // 페이지 로드 시 기존 세션 확인
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const session = await getSession();
+
+        if (session?.user) {
+          // 기존 세션이 있으면 로그인 상태로 설정
+          const displayName = await getDisplayName();
+          const nickname =
+            displayName || session.user.email?.split("@")[0] || "User";
+          setUserNickname(nickname);
+          setIsLoggedIn(true);
+        } else {
+          setIsLoggedIn(false);
+        }
+      } catch (error) {
+        console.error("Failed to check session:", error);
+        setIsLoggedIn(false);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkSession();
+  }, []);
+
+  // Supabase에서 보드 데이터 불러오기
+  useEffect(() => {
+    const loadBoards = async () => {
+      if (!isLoggedIn) {
+        setNodeDataMap({});
+        return;
+      }
+
+      setIsLoadingBoards(true);
+      try {
+        const boards = await readBoardsWithTags();
+
+        // BoardWithTags를 NodeData로 변환
+        const nodeDataMap: Record<string, NodeData> = {};
+        boards.forEach((board) => {
+          // 첫 번째 태그를 사용 (기존 로직과 호환)
+          const tag =
+            board.tags.length > 0
+              ? {
+                  name: board.tags[0].tag_name,
+                  color: board.tags[0].tag_color,
+                }
+              : undefined;
+
+          // date와 time을 합쳐서 Date 객체 생성
+          let date: Date | undefined;
+          if (board.date) {
+            const dateParts = board.date.split("-");
+            if (dateParts.length === 3) {
+              const year = Number(dateParts[0]);
+              const month = Number(dateParts[1]) - 1; // month는 0-indexed
+              const day = Number(dateParts[2]);
+
+              let hour = 12;
+              let minute = 0;
+              if (board.time) {
+                const timeParts = board.time.split(":");
+                if (timeParts.length >= 2) {
+                  hour = Number(timeParts[0]);
+                  minute = Number(timeParts[1]);
+                }
+              }
+
+              date = new Date(year, month, day, hour, minute);
+            }
+          }
+
+          nodeDataMap[board.board_id] = {
+            id: board.board_id,
+            tag: tag,
+            description: board.description || undefined,
+            date: date,
+          };
+        });
+
+        setNodeDataMap(nodeDataMap);
+      } catch (error) {
+        console.error("Failed to load boards:", error);
+        setNodeDataMap({});
+      } finally {
+        setIsLoadingBoards(false);
+      }
+    };
+
+    loadBoards();
+  }, [isLoggedIn]);
 
   const handleLogin = (nickname: string) => {
     setUserNickname(nickname);
     setIsLoggedIn(true);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Failed to sign out:", error);
+    }
     setIsLoggedIn(false);
     setUserNickname("Guest");
+    setNodeDataMap({});
   };
 
   const handleNodeClick = (
-    nodeId: number,
+    nodeId: string,
     position: { x: number; y: number }
   ) => {
     setSelectedNodeId(nodeId);
     setModalPosition(position);
-    setIsModalOpen(true);
+    setIsViewModalOpen(true); // ViewArchiveModal 열기
   };
 
   const handleToolbarNewArchive = () => {
     setSelectedNodeId(null);
     setModalPosition(null);
-    setIsModalOpen(true);
+    setIsEditModalOpen(true); // ArchiveModal 열기 (새 아카이브 생성)
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
+  const handleCloseViewModal = () => {
+    setIsViewModalOpen(false);
     setSelectedNodeId(null);
   };
 
-  const handleSaveArchive = (
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setSelectedNodeId(null);
+  };
+
+  const handleEditArchive = () => {
+    setIsViewModalOpen(false);
+    setIsEditModalOpen(true); // ArchiveModal 열기 (편집 모드)
+  };
+
+  const handleSaveArchive = async (
     tag: NodeTag | null,
     description: string,
     date: Date | null
   ) => {
-    if (selectedNodeId !== null) {
-      // Update existing node data
-      setNodeDataMap((prev) => ({
-        ...prev,
-        [selectedNodeId]: {
-          id: selectedNodeId,
-          tag: tag || prev[selectedNodeId]?.tag,
-          description,
-          date: date || prev[selectedNodeId]?.date,
-        },
-      }));
+    // 저장 후 데이터 다시 불러오기
+    if (isLoggedIn) {
+      try {
+        const boards = await readBoardsWithTags();
+        const nodeDataMap: Record<string, NodeData> = {};
+        boards.forEach((board) => {
+          const tag =
+            board.tags.length > 0
+              ? {
+                  name: board.tags[0].tag_name,
+                  color: board.tags[0].tag_color,
+                }
+              : undefined;
 
-      if (tag) {
-        // Update recent tags (add to beginning, remove duplicates, limit to 5)
-        setRecentTags((prev) => {
-          const filtered = prev.filter(
-            (t) => !(t.name === tag.name && t.color === tag.color)
-          );
-          return [tag, ...filtered].slice(0, 5);
+          // date와 time을 합쳐서 Date 객체 생성
+          let date: Date | undefined;
+          if (board.date) {
+            const dateParts = board.date.split("-");
+            if (dateParts.length === 3) {
+              const year = Number(dateParts[0]);
+              const month = Number(dateParts[1]) - 1; // month는 0-indexed
+              const day = Number(dateParts[2]);
+
+              let hour = 12;
+              let minute = 0;
+              if (board.time) {
+                const timeParts = board.time.split(":");
+                if (timeParts.length >= 2) {
+                  hour = Number(timeParts[0]);
+                  minute = Number(timeParts[1]);
+                }
+              }
+
+              date = new Date(year, month, day, hour, minute);
+            }
+          }
+
+          nodeDataMap[board.board_id] = {
+            id: board.board_id,
+            tag: tag,
+            description: board.description || undefined,
+            date: date,
+          };
         });
+        setNodeDataMap(nodeDataMap);
+      } catch (error) {
+        console.error("Failed to reload boards:", error);
       }
+    }
 
-      // Scroll to date if provided
-      if (date && timelineRef.current) {
-        timelineRef.current.scrollToDate(date);
-      }
-    } else if (tag && date) {
-      // Create new node
-      const newId = nextNodeId;
-      setNodeDataMap((prev) => ({
-        ...prev,
-        [newId]: {
-          id: newId,
-          tag,
-          description,
-          date,
-        },
-      }));
-
-      setNextNodeId((prev) => prev + 1);
-
+    if (tag) {
       // Update recent tags
       setRecentTags((prev) => {
         const filtered = prev.filter(
@@ -125,25 +252,67 @@ export default function App() {
         );
         return [tag, ...filtered].slice(0, 5);
       });
-
-      // Scroll to the new node's date
-      if (timelineRef.current) {
-        timelineRef.current.scrollToDate(date);
-      }
     }
-    handleCloseModal();
+
+    // Scroll to date if provided
+    if (date && timelineRef.current) {
+      timelineRef.current.scrollToDate(date);
+    }
+
+    handleCloseEditModal();
   };
 
-  const handleDeleteArchive = () => {
-    if (selectedNodeId !== null) {
-      // Remove node from nodeDataMap
-      setNodeDataMap((prev) => {
-        const newMap = { ...prev };
-        delete newMap[selectedNodeId];
-        return newMap;
-      });
+  const handleDeleteArchive = async () => {
+    // 삭제 후 데이터 다시 불러오기
+    if (isLoggedIn) {
+      try {
+        const boards = await readBoardsWithTags();
+        const nodeDataMap: Record<string, NodeData> = {};
+        boards.forEach((board) => {
+          const tag =
+            board.tags.length > 0
+              ? {
+                  name: board.tags[0].tag_name,
+                  color: board.tags[0].tag_color,
+                }
+              : undefined;
+
+          // date와 time을 합쳐서 Date 객체 생성
+          let date: Date | undefined;
+          if (board.date) {
+            const dateParts = board.date.split("-");
+            if (dateParts.length === 3) {
+              const year = Number(dateParts[0]);
+              const month = Number(dateParts[1]) - 1; // month는 0-indexed
+              const day = Number(dateParts[2]);
+
+              let hour = 12;
+              let minute = 0;
+              if (board.time) {
+                const timeParts = board.time.split(":");
+                if (timeParts.length >= 2) {
+                  hour = Number(timeParts[0]);
+                  minute = Number(timeParts[1]);
+                }
+              }
+
+              date = new Date(year, month, day, hour, minute);
+            }
+          }
+
+          nodeDataMap[board.board_id] = {
+            id: board.board_id,
+            tag: tag,
+            description: board.description || undefined,
+            date: date,
+          };
+        });
+        setNodeDataMap(nodeDataMap);
+      } catch (error) {
+        console.error("Failed to reload boards:", error);
+      }
     }
-    handleCloseModal();
+    handleCloseEditModal();
   };
 
   const handleDateSelect = (date: Date) => {
@@ -161,7 +330,7 @@ export default function App() {
     }
 
     const lowerQuery = query.toLowerCase();
-    const matches = new Set<number>();
+    const matches = new Set<string>();
 
     Object.values(nodeDataMap).forEach((node) => {
       // Search by tag name
@@ -189,8 +358,25 @@ export default function App() {
 
   return (
     <>
+      {/* 인증 확인 중 로딩 */}
+      {isCheckingAuth && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#F2F0EB]">
+          <span
+            style={{
+              fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+              fontSize: "14px",
+              opacity: 0.5,
+            }}
+          >
+            로딩 중...
+          </span>
+        </div>
+      )}
+
       {/* Login Modal */}
-      <LoginModal isOpen={!isLoggedIn} onLogin={handleLogin} />
+      {!isCheckingAuth && (
+        <LoginModal isOpen={!isLoggedIn} onLogin={handleLogin} />
+      )}
 
       {/* Header - Always visible and clear */}
       <header className="fixed top-0 left-0 right-0 pt-8 pb-8 pointer-events-none z-[100]">
@@ -287,14 +473,24 @@ export default function App() {
           <ProfileMenu onLogout={handleLogout} userNickname={userNickname} />
         )}
 
-        {/* Archive Modal */}
+        {/* View Archive Modal */}
+        <ViewArchiveModal
+          isOpen={isViewModalOpen}
+          onClose={handleCloseViewModal}
+          onEdit={handleEditArchive}
+          onDelete={handleDeleteArchive}
+          currentNodeData={
+            selectedNodeId !== null ? nodeDataMap[selectedNodeId] : undefined
+          }
+        />
+
+        {/* Edit/Create Archive Modal */}
         <ArchiveModal
-          isOpen={isModalOpen}
-          onClose={handleCloseModal}
+          isOpen={isEditModalOpen}
+          onClose={handleCloseEditModal}
           onSave={handleSaveArchive}
           onDelete={handleDeleteArchive}
           position={modalPosition}
-          recentTags={recentTags}
           currentNodeData={
             selectedNodeId !== null ? nodeDataMap[selectedNodeId] : undefined
           }

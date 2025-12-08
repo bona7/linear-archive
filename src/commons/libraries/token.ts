@@ -41,10 +41,10 @@ export async function clearAccessToken() {
   inMemoryAccessToken = null;
   recoilSetter?.(null);
 
-  // Supabase 세션도 로그아웃
-  try {
-    await supabase.auth.signOut();
-  } catch (error) {
-    console.error("Failed to sign out from Supabase:", error);
-  }
+  // // Supabase 세션도 로그아웃
+  // try {
+  //   await supabase.auth.signOut();
+  // } catch (error) {
+  //   console.error("Failed to sign out from Supabase:", error);
+  // }
 }

@@ -17,13 +17,20 @@ export interface SignInParams {
  * displayName은 user_metadata에 저장됨
  */
 export async function signUp({ email, password, displayName }: SignUpParams) {
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (typeof window !== "undefined"
+      ? window.location.origin
+      : "http://localhost:3000");
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: {
-        display_name: displayName, // user_metadata에 저장
+        display_name: displayName,
       },
+      emailRedirectTo: `${siteUrl}?signup_step=success`, // 이메일 인증 후 성공 단계로 리다이렉트
     },
   });
 
@@ -58,8 +65,15 @@ export async function signIn({ email, password }: SignInParams) {
  * 로그아웃
  */
 export async function signOut() {
+  // 3. 마지막으로 localStorage 완전히 비우기 (선택사항)
+  if (typeof window !== "undefined") {
+    localStorage.clear();
+  }
+  // 1. 먼저 Supabase 세션 정리 (이것이 localStorage의 Supabase 관련 항목도 정리함)
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+
+  // 2. 메모리와 Recoil 상태 정리 (내부의 signOut 호출은 중복이므로 제거 필요)
   await clearAccessToken();
 }
 
@@ -91,14 +105,23 @@ export async function getUser() {
  * 현재 사용자의 displayName 가져오기
  */
 export async function getDisplayName(): Promise<string | null> {
-  const user = await getUser();
-  return (user.user_metadata?.display_name as string) || null;
+  const session = await getSession();
+  if (!session?.user) {
+    return null;
+  }
+  return (session.user.user_metadata?.display_name as string) || null;
 }
 
 /**
  * displayName 업데이트
  */
 export async function updateDisplayName(displayName: string) {
+  // 세션 확인
+  const session = await getSession();
+  if (!session?.user) {
+    throw new Error("Auth session missing! 이메일 인증을 완료해주세요.");
+  }
+
   const { data, error } = await supabase.auth.updateUser({
     data: {
       display_name: displayName,
