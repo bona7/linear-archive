@@ -30,11 +30,12 @@ export interface BoardWithTags extends Board {
 export interface CreateBoardParams {
   description?: string;
   date?: string;
+  time?: string; // Added time
   tags: Array<{
     tag_name: string;
     tag_color: string;
   }>;
-  image?: File;
+  image?: File | null; // Allow null explicity
 }
 
 /**
@@ -88,6 +89,7 @@ export async function createBoard(params: CreateBoardParams) {
           user_id: userId,
           description: params.description || null,
           date: params.date || null,
+          time: params.time || null, // Insert time
         },
       ])
       .select()

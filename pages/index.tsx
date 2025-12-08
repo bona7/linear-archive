@@ -440,6 +440,126 @@ export default function App() {
           style={{ height: user ? "280px" : "240px" }}
         />
 
+        {/* Generate Tags Button (Dev Only/Temporary) */}
+        {user && (
+          <div className="absolute top-4 right-4 z-[200]">
+            <button
+               onClick={async () => {
+                 try {
+                   console.log("Calling API route for generation...");
+                   const res = await fetch('/api/generate-tags', { method: 'POST' });
+                   const data = await res.json();
+                   
+                   if (!res.ok) throw new Error(data.error || "Generation failed");
+
+                   console.log("Got tags from API. Inserting into Supabase...", data.items);
+
+                   // Dynamically import supabase client
+                   const { supabase } = await import("@/commons/libs/supabase/client");
+
+                   // Add user_id to each item
+                   const itemsWithUser = data.items.map((item: any) => ({
+                       ...item,
+                       user_id: user.id
+                   }));
+
+                   const { data: insertedData, error } = await supabase
+                      .from("tags")
+                      .insert(itemsWithUser)
+                      .select();
+
+                   if (error) {
+                     alert(`Supabase Insert Error: ${error.message}`);
+                   } else {
+                     alert(`Success! Generated and saved ${insertedData?.length} tags.`);
+                     window.location.reload(); 
+                   }
+                 } catch (e: any) {
+                   console.error(e);
+                   alert(`Failed: ${e.message}`);
+                 }
+               }}
+               className="bg-black text-white px-4 py-2 rounded shadow hover:bg-gray-800 transition"
+            >
+              Generate Tags (Server)
+            </button>
+          </div>
+        )}
+
+        {/* Generate Boards Button (Dev Only/Temporary) */}
+        {user && (
+          <div className="absolute top-16 right-4 z-[200]">
+            <button
+               onClick={async () => {
+                 try {
+                   console.log("Calling API route for BOARD generation...");
+                   
+                   // 1. Prepare available tags
+                   const availableTagNames = tags.map(t => t.name);
+                   
+                   const res = await fetch('/api/generate-boards', { 
+                       method: 'POST',
+                       headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify({ availableTags: availableTagNames })
+                   });
+                   const data = await res.json();
+                   
+                   if (!res.ok) throw new Error(data.error || "Generation failed");
+
+                   console.log("Got boards from API. Creating via createBoard...", data.items);
+
+                   // Dynamically import createBoard
+                   const { createBoard } = await import("@/commons/libs/supabase/db");
+
+                   // Process serially to avoid overwhelming Supabase or hitting rate limits
+                   let success = 0;
+                   let failed = 0;
+                   
+                   for (const item of data.items) {
+                      try {
+                          // Map string tags back to full tag objects { tag_name, tag_color }
+                          // availableTags is a string array in response.
+                          // We need to look up the color from our local 'tags' state.
+                          const mappedTags = (item.tags || []).map((tagName: string) => {
+                              const found = tags.find(t => t.name === tagName);
+                              if (found) {
+                                  return { tag_name: found.name, tag_color: found.color };
+                              }
+                              return null;
+                          }).filter((t: any) => t !== null);
+
+                          await createBoard({
+                             description: item.description,
+                             date: item.date,
+                             tags: mappedTags,
+                             image: null
+                          });
+                          success++;
+                      } catch (err) {
+                          console.error("Failed to create board:", item, err);
+                          failed++;
+                      }
+                   }
+
+                   if (failed > 0) {
+                      alert(`Partial Success: ${success} created, ${failed} failed.`);
+                   } else {
+                      alert(`Success! Created ${success} boards.`);
+                      window.location.reload();
+                   }
+
+                 } catch (e: any) {
+                   console.error(e);
+                   alert(`Failed: ${e.message}`);
+                 }
+               }}
+               className="bg-black text-white px-4 py-2 rounded shadow hover:bg-gray-800 transition"
+            >
+              Generate Boards
+            </button>
+          </div>
+        )}
+
         {/* Search Bar */}
         {isSearching && (
           <div className="pb-8 pt-4">
