@@ -444,8 +444,6 @@ export const Timeline = forwardRef<
                     top: "-50%",
                     transform: "translateY(-50%)",
                     zIndex: marker.isYear ? 2 : 1,
-                    opacity: 0.5,
-                    filter: "blur(0.5px)",
                   }}
                 >
                   <div
@@ -495,7 +493,7 @@ export const Timeline = forwardRef<
                         transform: "translateX(-50%)",
                         fontFamily: "'JetBrains Mono', monospace",
                         fontSize: "12px",
-                        color: label.day === 1 ? "black" : "#666",
+                        color: label.day === 1 ? "black" : "#000000",
                         fontWeight: label.day === 1 ? "bold" : "normal",
                       }}
                     >
