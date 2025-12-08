@@ -215,7 +215,7 @@ export const Timeline = forwardRef<
         nodes: typeof allNodes;
       }> = [];
 
-      const clusterThreshold = 0.5 / zoom;
+      const clusterThreshold = 0.6 / zoom;
       let currentCluster: typeof allNodes = [];
       let clusterId = 0;
 
@@ -262,8 +262,8 @@ export const Timeline = forwardRef<
       isHovered: boolean
     ) => {
       if (clusterSize === 1) return { x: 0, y: 0 };
-      const baseRadius = isHovered ? 28 : 10;
-      const radius = baseRadius + (clusterSize > 6 ? (clusterSize - 6) * 2 : 0);
+      const baseRadius = isHovered ? 30 : 20;
+      const radius = baseRadius + (clusterSize > 6 ? (clusterSize - 6) * 4 : 0);
       const angle = (index / clusterSize) * Math.PI * 2 - Math.PI / 2;
       return {
         x: Math.cos(angle) * radius,
@@ -444,8 +444,6 @@ export const Timeline = forwardRef<
                     top: "-50%",
                     transform: "translateY(-50%)",
                     zIndex: marker.isYear ? 2 : 1,
-                    opacity: 0.5,
-                    filter: "blur(0.5px)",
                   }}
                 >
                   <div
@@ -495,7 +493,7 @@ export const Timeline = forwardRef<
                         transform: "translateX(-50%)",
                         fontFamily: "'JetBrains Mono', monospace",
                         fontSize: "12px",
-                        color: label.day === 1 ? "black" : "#666",
+                        color: label.day === 1 ? "black" : "#000000",
                         fontWeight: label.day === 1 ? "bold" : "normal",
                       }}
                     >
@@ -570,7 +568,7 @@ export const Timeline = forwardRef<
                   }}
                 >
                   <div
-                    className="w-4 h-4 transition-all"
+                    className="w-6 h-6 transition-all"
                     style={{
                       borderRadius: "50%",
                       backgroundColor: nodeTag?.tag_color || "#F2F0EB",
@@ -583,7 +581,7 @@ export const Timeline = forwardRef<
                         ? "0 0 0 3px rgba(0, 0, 0, 0.3)"
                         : "none",
                       transform:
-                        hoveredNodeId === node.id ? "scale(2.5)" : "scale(1)",
+                        hoveredNodeId === node.id ? "scale(2)" : "scale(1)",
                     }}
                   />
                 </div>
@@ -629,7 +627,7 @@ export const Timeline = forwardRef<
               offset.x;
             const currentY = rect.top + rect.height / 2 + offset.y;
 
-            const nodeRadius = 20;
+            const nodeRadius = 18;
             const lineStartY = currentY + nodeRadius;
 
             return (

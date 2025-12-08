@@ -401,7 +401,7 @@ export default function App() {
             <span
               className="tracking-tight"
               style={{
-                fontFamily: "'Space Grotesk', 'Pretendard', sans-serif",
+                fontFamily: "Georgia, 'Pretendard', sans-serif",
                 fontSize: "48px",
                 fontWeight: "bold",
                 lineHeight: "1",
@@ -416,7 +416,7 @@ export default function App() {
         <h1
           className="text-center tracking-tight transition-all duration-700 ease-out"
           style={{
-            fontFamily: "'Space Grotesk', sans-serif",
+            fontFamily: "Georgia, sans-serif",
             fontSize: "96px",
             fontWeight: "bold",
             lineHeight: "1",
