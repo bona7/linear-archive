@@ -10,15 +10,13 @@ import { NodeData, NodeTag } from "@/commons/types/types";
 import {
   signOut,
   getSession,
-  getDisplayName,
 } from "@/commons/libs/supabase/auth";
 import {
   BoardWithTags,
   readBoardsWithTags,
   getCurrentUserTags,
-  deleteBoard, // Assuming deleteBoard exists in db.ts and takes boardId: string
 } from "@/commons/libs/supabase/db";
-import { Router, useRouter } from "next/router";
+import { useRouter } from "next/router";
 import { AnalysisPanel } from "@/design/components/AnalysisPanel";
 import {
   LoadingOverlay,
@@ -26,7 +24,6 @@ import {
 } from "@/commons/libraries/loadingOverlay";
 import styled from "@emotion/styled";
 
-// 전체 화면을 덮는 로딩 오버레이
 const FullScreenLoadingOverlay = styled(LoadingOverlay)`
   position: fixed !important;
   top: 0;
@@ -54,12 +51,32 @@ export default function App() {
   const [displayNameValue, setDisplayNameValue] = useState<string | null>(null);
   const [tags, setTags] = useState<NodeTag[]>([]);
   const [selectedFilterTags, setSelectedFilterTags] = useState<NodeTag[]>([]);
-  const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false); // AnalysisPanel 상태 추가
-  const [isLoggingOut, setIsLoggingOut] = useState(false); // 로그아웃 로딩 상태 추가
+  const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [initialSignUpStep, setInitialSignUpStep] = useState<
     "email" | "check_email" | "success" | null
-  >(null); // 초기 회원가입 단계
-  const [isSignUpMode, setIsSignUpMode] = useState(false); // LoginModal 회원가입 모드 상태
+  >(null);
+  const [isSignUpMode, setIsSignUpMode] = useState(false);
+  const { minYear, maxYear } = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    
+    if (boards.length === 0) {
+      return { minYear: currentYear - 1, maxYear: currentYear + 1 };
+    }
+
+    const years = boards
+      .map(b => b.date ? new Date(b.date).getFullYear() : currentYear)
+      .filter(y => !isNaN(y));
+
+    if (years.length === 0) {
+      return { minYear: currentYear - 1, maxYear: currentYear + 1 };
+    }
+
+    return {
+      minYear: Math.min(...years), // 가장 과거 노드의 연도
+      maxYear: Math.max(...years, currentYear) // 오늘 날짜
+    };
+  }, [boards]);
 
   const nodeDataMap = useMemo(() => {
     return Object.fromEntries(boards.map((board) => [board.board_id, board]));
@@ -83,11 +100,9 @@ export default function App() {
     try {
       const session = await getSession();
       if (session?.user) {
-        // 상태가 실제로 변경될 때만 업데이트하여 불필요한 리렌더링 방지
         const displayName =
           (session.user.user_metadata?.display_name as string) || null;
 
-        // 이메일 인증 완료 후 success 단계로 이동 (닉네임은 이미 입력됨)
         if (
           session.user.email_confirmed_at &&
           displayName &&
@@ -102,19 +117,17 @@ export default function App() {
           setDisplayNameValue(displayName);
         }
       } else {
-        // user가 이미 null이 아닐 때만 null로 설정
         if (user !== null) {
           setUser(null);
           setDisplayNameValue(null);
-          setInitialSignUpStep(null); // 사용자가 없을 때 초기화
+          setInitialSignUpStep(null);
         }
       }
     } catch (err) {
-      // 에러 발생 시에만 상태 업데이트
       if (user !== null) {
         setUser(null);
         setDisplayNameValue(null);
-        setInitialSignUpStep(null); // 에러 시에도 초기화
+        setInitialSignUpStep(null);
       }
     }
   };
@@ -127,9 +140,12 @@ export default function App() {
 
   useEffect(() => {
     if (!user) {
-      setBoards([]); // 또는 아무것도 하지 않기
+      setBoards([]);
       return;
     }
+    // [중요] 로그인 성공 시 회원가입 모드 해제
+    setIsSignUpMode(false);
+
     const loadBoards = async () => {
       try {
         const data = await readBoardsWithTags();
@@ -143,7 +159,6 @@ export default function App() {
       if (!user) return;
       try {
         const tags = await getCurrentUserTags();
-        // Tag 타입을 NodeTag 타입으로 변환
         const nodeTags: NodeTag[] = tags.map((tag) => ({
           name: tag.tag_name,
           color: tag.tag_color,
@@ -159,19 +174,20 @@ export default function App() {
 
   const handleLogin = () => {
     checkUser();
+    setIsSignUpMode(false);
   };
 
   const handleLogout = async () => {
-    setIsLoggingOut(true); // 로딩 시작
+    setIsLoggingOut(true);
     try {
       await signOut();
       setUser(null);
       setDisplayNameValue(null);
-      setInitialSignUpStep(null); // 회원가입 단계 초기화
+      setInitialSignUpStep(null);
     } catch (err: any) {
       console.error(err.message || "로그아웃 실패");
     } finally {
-      setIsLoggingOut(false); // 로딩 종료
+      setIsLoggingOut(false);
     }
   };
 
@@ -181,13 +197,13 @@ export default function App() {
   ) => {
     setSelectedNodeId(nodeId);
     setModalPosition(position);
-    setIsViewModalOpen(true); // ViewArchiveModal 열기
+    setIsViewModalOpen(true);
   };
 
   const handleToolbarNewArchive = () => {
     setSelectedNodeId(null);
     setModalPosition(null);
-    setIsEditModalOpen(true); // ArchiveModal 열기 (새 아카이브 생성)
+    setIsEditModalOpen(true);
   };
 
   const handleCloseViewModal = () => {
@@ -202,11 +218,10 @@ export default function App() {
 
   const handleEditArchive = () => {
     setIsViewModalOpen(false);
-    setIsEditModalOpen(true); // ArchiveModal 열기 (편집 모드)
+    setIsEditModalOpen(true);
   };
 
   const handleSaveArchive = async (date: Date | null) => {
-    // 저장 후 데이터 다시 불러오기
     if (user) {
       try {
         const updatedBoards = await readBoardsWithTags();
@@ -216,7 +231,6 @@ export default function App() {
       }
     }
 
-    // Scroll to date if provided
     if (date && timelineRef.current) {
       timelineRef.current.scrollToDate(date);
     }
@@ -225,7 +239,6 @@ export default function App() {
   };
 
   const handleDeleteArchive = async () => {
-    // 삭제 후 데이터 다시 불러오기
     if (user) {
       try {
         const updatedBoards = await readBoardsWithTags();
@@ -253,7 +266,6 @@ export default function App() {
     const lowerQuery = query.toLowerCase();
     const matches = new Set<string>();
     Object.values(nodeDataMap).forEach((node) => {
-      // Search by tag name
       const tagMatch = node.tags?.[0]?.tag_name
         .toLowerCase()
         .includes(lowerQuery);
@@ -277,30 +289,25 @@ export default function App() {
 
   const handleTagClick = (tag: NodeTag) => {
     setSelectedFilterTags((prev) => {
-      // 이미 선택된 태그인지 확인
       const isSelected = prev.some(
         (t) => t.name === tag.name && t.color === tag.color
       );
 
       let newSelectedTags;
       if (isSelected) {
-        // 이미 선택된 태그면 제거
         newSelectedTags = prev.filter(
           (t) => !(t.name === tag.name && t.color === tag.color)
         );
       } else {
-        // 선택되지 않은 태그면 추가
         newSelectedTags = [...prev, tag];
       }
 
-      // 필터링 업데이트
       if (newSelectedTags.length === 0) {
         setMatchedNodeIds(new Set());
         setSearchQuery("");
       } else {
         const matches = new Set<string>();
         Object.values(nodeDataMap).forEach((node) => {
-          // 선택된 태그 중 하나라도 가지고 있으면 매칭
           const hasAnyTag = newSelectedTags.some((selectedTag) =>
             node.tags.some(
               (t) =>
@@ -328,11 +335,9 @@ export default function App() {
     console.log("검색/필터링 매칭 노드:", matchedNodeIds);
   }, [matchedNodeIds]);
 
-  // URL 쿼리 파라미터 확인
   useEffect(() => {
     const { signup_step } = router.query;
 
-    // 새 창에서 열린 경우 부모 창으로 리다이렉트
     if (window.opener && signup_step === "success") {
       const currentUrl = window.location.href;
       window.opener.location.href = currentUrl;
@@ -340,17 +345,15 @@ export default function App() {
       return;
     }
 
-    // 이메일 인증 완료 후 success 단계로 이동
     if (signup_step === "success") {
       setInitialSignUpStep("success");
-      // 쿼리 파라미터 제거 (URL 정리)
       router.replace("/", undefined, { shallow: true });
     }
   }, [router.query, router]);
 
   return (
     <>
-      {/* Login Modal */}
+      {/* Login Modal (z-index 50) - 헤더보다 위에 위치 */}
       <LoginModal
         isOpen={!user}
         onLogin={handleLogin}
@@ -358,7 +361,6 @@ export default function App() {
         onSignUpModeChange={setIsSignUpMode}
       />
 
-      {/* Logout Loading Overlay */}
       <FullScreenLoadingOverlay visible={isLoggingOut}>
         <LoadingIcon spin fontSize={48} />
       </FullScreenLoadingOverlay>
@@ -371,9 +373,12 @@ export default function App() {
         />
       )}
 
-      {/* Header - Always visible and clear */}
-      <header className="fixed top-0 left-0 right-0 pt-8 pb-8 pointer-events-none z-[100]">
-        {/* User Nickname - Only shown when logged in */}
+      {/* [수정됨] Header 
+        - z-index: 50 (배경보다 무조건 위에 있어야 함)
+        - pointer-events-none: 클릭 통과 (하위 버튼들은 auto로 설정)
+      */}
+      <header className="fixed top-0 left-0 right-0 pt-8 pb-8 pointer-events-none z-50">
+        {/* User Nickname */}
         {user && (
           <div
             className="text-center mb-4 transition-all duration-700 ease-out"
@@ -385,8 +390,9 @@ export default function App() {
             <span
               className="tracking-tight"
               style={{
-                fontFamily: "Georgia, serif",
+                fontFamily: "'Space Grotesk', 'Pretendard', sans-serif",
                 fontSize: "48px",
+                fontWeight: "bold",
                 lineHeight: "1",
               }}
             >
@@ -395,49 +401,53 @@ export default function App() {
           </div>
         )}
 
-        {/* Linear Archive Title - 회원가입 모드일 때 숨김 */}
-        {!isSignUpMode && (
-          <h1
-            className="text-center tracking-tight transition-all duration-700 ease-out"
-            style={{
-              fontFamily: "Georgia, serif",
-              fontSize: "96px",
-              lineHeight: "1",
-              transform: user ? "translateY(0)" : "translateY(40px)",
-            }}
-          >
-            Linear Archive
-          </h1>
-        )}
+        {/* Linear Archive Title - 조건문 제거, 항상 렌더링 */}
+        <h1
+          className="text-center tracking-tight transition-all duration-700 ease-out"
+          style={{
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontSize: "96px",
+            fontWeight: "bold",
+            lineHeight: "1",
+            transform: user ? "translateY(0)" : "translateY(40px)",
+          }}
+        >
+          Linear Archive
+        </h1>
 
-        {/* Toolbar - Below Title - Only shown when logged in */}
+        {/* Toolbar */}
         {user && (
           <div className="flex justify-center mt-6 pointer-events-auto">
             <Toolbar
               onNewArchive={handleToolbarNewArchive}
               onDateSelect={handleDateSelect}
               onSearch={handleOpenSearch}
+              minYear={minYear}
+              maxYear={maxYear}
             />
           </div>
         )}
       </header>
 
+      {/* [수정됨] Main Content Background
+        - z-index: 0 (가장 뒤로 보내서 헤더를 덮지 않게 함)
+      */}
       <div
-        className={`min-h-screen bg-[#F2F0EB] relative overflow-hidden flex flex-col transition-all duration-500 z-[120]${
+        className={`min-h-screen bg-[#F2F0EB] relative overflow-hidden flex flex-col transition-all duration-500 z-0 ${
           !user ? "blur-[2px]" : "blur-0"
         }`}
         style={{
           backgroundImage: `
             radial-gradient(circle, rgba(0, 0, 0, 0.15) 1px, transparent 1px),
-            url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' /%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23noise)' opacity='0.06'/%3E%3C/svg%3E\")
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' /%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23noise)' opacity='0.06'/%3E%3C/svg%3E")
           `,
           backgroundSize: "24px 24px, 400px 400px",
         }}
       >
-        {/* Header Spacer - Adjusts based on login state */}
+        {/* Header Spacer - 헤더 높이만큼 공간 확보 */}
         <div
           className="transition-all duration-700 ease-out"
-          style={{ height: user ? "280px" : "240px" }}
+          style={{ height: user ? "320px" : "280px" }}
         />
 
         {/* Search Bar */}
@@ -451,7 +461,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Tags List - Below Search Bar */}
+        {/* Tags List */}
         <div className="flex justify-center overflow-hidden p-8 space-x-8">
           {tags.map((tag, index) => {
             const isSelected = selectedFilterTags.some(
@@ -478,7 +488,7 @@ export default function App() {
                 />
                 <span
                   style={{
-                    fontFamily: "SF Mono, Menlo, Monaco, Consolas, monospace",
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
                     fontSize: "14px",
                   }}
                 >
@@ -489,7 +499,7 @@ export default function App() {
           })}
         </div>
 
-        {/* Timeline Section - Center of Screen */}
+        {/* Timeline Section */}
         <div className="flex-1 flex items-center justify-center w-full">
           <Timeline
             onNodeClick={handleNodeClick}
@@ -500,46 +510,46 @@ export default function App() {
             ref={timelineRef}
           />
         </div>
-
-        {/* Profile Menu - Top Right */}
-        {user && (
-          <ProfileMenu
-            onLogout={handleLogout}
-            userNickname={displayNameValue}
-          />
-        )}
-
-        {(() => {
-          const currentViewNodeData =
-            selectedNodeId !== null
-              ? boardToNodeData(nodeDataMap[selectedNodeId])
-              : undefined;
-
-          return (
-            <ViewArchiveModal
-              isOpen={isViewModalOpen}
-              onClose={handleCloseViewModal}
-              onEdit={handleEditArchive}
-              onDelete={handleDeleteArchive}
-              currentNodeData={currentViewNodeData}
-            />
-          );
-        })()}
-
-        {/* Archive Modal */}
-        <ArchiveModal
-          isOpen={isEditModalOpen}
-          onClose={handleCloseEditModal}
-          onSave={handleSaveArchive}
-          onDelete={handleDeleteArchive}
-          position={modalPosition}
-          currentNodeData={
-            selectedNodeId !== null
-              ? boardToNodeData(nodeDataMap[selectedNodeId])
-              : undefined
-          }
-        />
       </div>
+
+      {/* Modals & Menu (z-index는 컴포넌트 내부나 fixed로 제어됨) */}
+      
+      {user && (
+        <ProfileMenu
+          onLogout={handleLogout}
+          userNickname={displayNameValue}
+        />
+      )}
+
+      {(() => {
+        const currentViewNodeData =
+          selectedNodeId !== null
+            ? boardToNodeData(nodeDataMap[selectedNodeId])
+            : undefined;
+
+        return (
+          <ViewArchiveModal
+            isOpen={isViewModalOpen}
+            onClose={handleCloseViewModal}
+            onEdit={handleEditArchive}
+            onDelete={handleDeleteArchive}
+            currentNodeData={currentViewNodeData}
+          />
+        );
+      })()}
+
+      <ArchiveModal
+        isOpen={isEditModalOpen}
+        onClose={handleCloseEditModal}
+        onSave={handleSaveArchive}
+        onDelete={handleDeleteArchive}
+        position={modalPosition}
+        currentNodeData={
+          selectedNodeId !== null
+            ? boardToNodeData(nodeDataMap[selectedNodeId])
+            : undefined
+        }
+      />
     </>
   );
 }
