@@ -7,10 +7,7 @@ import { LoginModal } from "@/design/components/LoginModal";
 import { ProfileMenu } from "@/design/components/ProfileMenu";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { NodeData, NodeTag } from "@/commons/types/types";
-import {
-  signOut,
-  getSession,
-} from "@/commons/libs/supabase/auth";
+import { signOut, getSession } from "@/commons/libs/supabase/auth";
 import {
   BoardWithTags,
   readBoardsWithTags,
@@ -59,14 +56,14 @@ export default function App() {
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const { minYear, maxYear } = useMemo(() => {
     const currentYear = new Date().getFullYear();
-    
+
     if (boards.length === 0) {
       return { minYear: currentYear - 1, maxYear: currentYear + 1 };
     }
 
     const years = boards
-      .map(b => b.date ? new Date(b.date).getFullYear() : currentYear)
-      .filter(y => !isNaN(y));
+      .map((b) => (b.date ? new Date(b.date).getFullYear() : currentYear))
+      .filter((y) => !isNaN(y));
 
     if (years.length === 0) {
       return { minYear: currentYear - 1, maxYear: currentYear + 1 };
@@ -74,7 +71,7 @@ export default function App() {
 
     return {
       minYear: Math.min(...years), // 가장 과거 노드의 연도
-      maxYear: Math.max(...years, currentYear) // 오늘 날짜
+      maxYear: Math.max(...years, currentYear), // 오늘 날짜
     };
   }, [boards]);
 
@@ -421,6 +418,8 @@ export default function App() {
             fontWeight: "bold",
             lineHeight: "1",
             transform: user ? "translateY(0)" : "translateY(40px)",
+            opacity: isSignUpMode ? 0 : 1,
+            visibility: isSignUpMode ? "hidden" : "visible",
           }}
         >
           Linear Archive
@@ -524,12 +523,9 @@ export default function App() {
       </div>
 
       {/* Modals & Menu (z-index는 컴포넌트 내부나 fixed로 제어됨) */}
-      
+
       {user && (
-        <ProfileMenu
-          onLogout={handleLogout}
-          userNickname={displayNameValue}
-        />
+        <ProfileMenu onLogout={handleLogout} userNickname={displayNameValue} />
       )}
 
       {(() => {
