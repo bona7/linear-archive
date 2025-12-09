@@ -167,7 +167,7 @@ function MyApp({ Component, pageProps }) {
   return (
     <>
       <Head>
-        <title>연표아카이빙</title>
+        <title>Linear Archive</title>
         <meta name="description" content="연표아카이빙" />
       </Head>
 
