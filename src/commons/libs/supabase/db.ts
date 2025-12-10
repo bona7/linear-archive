@@ -1,6 +1,7 @@
 import { supabase } from "./client";
 import { uploadPostImage, getPostImageUrl } from "./storage";
 import { CallEmbedding } from "../voyage/embeddingClient";
+import { triggerDataCompression } from "../../statistics/AnalysisCall";
 
 // 타입 정의
 export interface Board {
@@ -187,6 +188,38 @@ export async function createBoard(params: CreateBoardParams) {
     }).catch((embedErr) => {
       console.warn("Embedding call failed:", embedErr);
     });
+
+    // 9. CHECK FOR DATA COMPRESSION TRIGGER
+    // Count boards
+    supabase.from('board').select('*', { count: 'exact', head: true }).eq('user_id', userId)
+      .then(({ count }) => {
+          if (count !== null && count > 0 && count % 15 === 0) {
+              console.log(`[Compression] Board count is ${count}. Triggering compression...`);
+              
+              // Fetch latest 15 boards to compress
+              // Note: We want the *latest* ones just added.
+              supabase.from('board')
+                .select(`
+                  description, 
+                  date, 
+                  board_tag_jointable (tags (tag_name))
+                `)
+                .eq('user_id', userId)
+                .order('date', {ascending: false})
+                .limit(15)
+                .then(({data}) => {
+                   if(data) {
+                       // Clean up structure for AI
+                       const cleanParams = data.map((b: any) => ({
+                           description: b.description,
+                           date: b.date,
+                           tags: b.board_tag_jointable?.map((bt: any) => bt.tags?.tag_name).filter(Boolean) || []
+                       }));
+                       triggerDataCompression(cleanParams);
+                   }
+                });
+          }
+      });
 
     return {
       ...boardData,

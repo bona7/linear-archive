@@ -92,7 +92,7 @@ def lambda_handler(event, context):
                 "query_embedding": combined_embedding,
                 "query_user_id": event.get("user_id"),
                 "match_threshold": 0.75,
-                "match_count": 10
+                "match_count": 20
             }).execute()
 
             relevant_boards = similarity_response.data
@@ -116,6 +116,18 @@ def lambda_handler(event, context):
             ])
             print(f"Board context prepared: {board_context[:200]}...")
 
+            # If mode is search_only, return boards directly
+            if event.get("task") == "search_only":
+                print("Returning search results without LLM generation")
+                return {
+                    'statusCode': 200,
+                    'headers': cors_headers,
+                    'body': json.dumps({
+                        'boards': relevant_boards,
+                        'count': len(relevant_boards)
+                    })
+                }
+
         except Exception as e:
             print(f"ERROR: Similarity search failed: {str(e)}")
             return {
@@ -132,7 +144,17 @@ def lambda_handler(event, context):
                 "role": "system",
                 "content": f"You are a helpful assistant. Here are the user's relevant boards:\n\n{board_context}\n\nUse this information to answer the user's questions about their boards."
             }
-            deepseek_messages.insert(0, context_message)
+            if isinstance(deepseek_messages, list):
+                deepseek_messages.insert(0, context_message)
+            else:
+                 # Handle case where user_query might be a list or object, though typically string
+                 # But based on initial code, user_query was passed directly to messages which is wrong for chat completion if it's just a string?
+                 # Wait, looking at lines 138: "messages": deepseek_messages
+                 # If user_query is a string, deepseek_messages = user_query. This is invalid for chat API.
+                 # It should be [{"role": "user", "content": user_query}]
+                 # Fixing this bug as well while here.
+                 deepseek_messages = [{"role": "user", "content": str(user_query)}]
+                 deepseek_messages.insert(0, context_message)
 
         deepseek_request = {
             "model": event.get("model", "deepseek-chat"),
