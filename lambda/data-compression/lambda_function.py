@@ -1,7 +1,12 @@
 import json
 import os
 import requests
-from supabase import create_client, Client
+import logging
+import traceback
+
+# Configure logging for CloudWatch
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
     # CORS headers
@@ -12,11 +17,17 @@ def lambda_handler(event, context):
         'Access-Control-Allow-Methods': 'POST,OPTIONS'
     }
 
-    if event.get('httpMethod') == 'OPTIONS':
+    # Detect HTTP method
+    method = event.get('httpMethod')
+    if not method and 'requestContext' in event and 'http' in event['requestContext']:
+        method = event['requestContext']['http']['method']
+
+    if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': cors_headers, 'body': ''}
 
     try:
-        print("=== Data Compression Lambda Started ===")
+        logger.info("=== Data Compression Lambda Started ===")
+        logger.info(f"Event: {json.dumps(event)}")
         
         # 1. Environment Variables
         SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -24,141 +35,201 @@ def lambda_handler(event, context):
         DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
 
         if not all([SUPABASE_URL, SUPABASE_KEY, DEEPSEEK_API_KEY]):
+            missing = []
+            if not SUPABASE_URL: missing.append("SUPABASE_URL")
+            if not SUPABASE_KEY: missing.append("SUPABASE_KEY")
+            if not DEEPSEEK_API_KEY: missing.append("DEEPSEEK_API_KEY")
+            logger.error(f"Missing environment variables: {missing}")
             return {
                 'statusCode': 500,
                 'headers': cors_headers,
-                'body': json.dumps({'error': 'Missing environment variables'})
+                'body': json.dumps({'error': 'Missing environment variables', 'missing': missing})
             }
 
-        # 2. Parse Input and Verify Auth
-        body = event
+        # 2. Parse Input - API Gateway sends body as JSON string
+        body_data = {}
         if "body" in event and isinstance(event["body"], str):
-             body = json.loads(event["body"])
+            body_data = json.loads(event["body"])
+        elif isinstance(event, dict) and "body" not in event:
+            # Direct invocation or Function URL (body is the event itself)
+            body_data = event
         
-        access_token = body.get("access_token")
-        refresh_token = body.get("refresh_token")
-        new_boards = body.get("boards")
+        logger.info(f"Parsed body: {json.dumps(body_data, default=str)}")
+        
+        new_boards = body_data.get("boards")
 
-        if not access_token or not refresh_token or not new_boards:
+        if not new_boards:
+            logger.error(f"Missing required field - boards: {bool(new_boards)}")
+            logger.error(f"Body data keys: {list(body_data.keys())}")
             return {
                 'statusCode': 400,
                 'headers': cors_headers,
-                'body': json.dumps({'error': 'Missing access_token, refresh_token, or boards'})
+                'body': json.dumps({'error': 'Missing boards data'})
             }
 
-        # 3. Initialize Supabase and Auth
-        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        # 3. Get user_id from API Gateway authorizer context
+        # API Gateway Authorizer validates the Supabase token and passes user info
+        user_id = None
+        access_token = None
         
-        try:
-            print("Verifying Supabase Session...")
-            supabase.auth.set_session(access_token, refresh_token)
-            user_response = supabase.auth.get_user()
-            user_id = user_response.user.id
-            print(f"Authenticated User ID: {user_id}")
-        except Exception as auth_error:
-            print(f"Auth Error: {str(auth_error)}")
+        # Try to extract access token from Authorization header
+        if 'headers' in event:
+            auth_header = event['headers'].get('Authorization') or event['headers'].get('authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                access_token = auth_header.replace('Bearer ', '')
+                logger.info("Access token extracted from Authorization header")
+        
+        # Fallback to body
+        if not access_token:
+            access_token = body_data.get("access_token")
+
+        if not access_token:
+             logger.warning("No access_token found. Database operations might fail if RLS is active and Service Key is not used.")
+
+        # Try to get user_id from authorizer context (API Gateway)
+        if 'requestContext' in event and 'authorizer' in event['requestContext']:
+            authorizer = event['requestContext']['authorizer']
+            user_id = (
+                authorizer.get('claims', {}).get('sub') or
+                authorizer.get('principalId') or
+                authorizer.get('user_id')
+            )
+            if user_id:
+                logger.info(f"User ID from API Gateway authorizer: {user_id}")
+        
+        # Fallback: extract from body if provided (for testing/backward compatibility)
+        if not user_id:
+            user_id = body_data.get("user_id")
+            if user_id:
+                logger.info(f"User ID from request body: {user_id}")
+        
+        if not user_id:
+            logger.error("No user_id found in authorizer context or request body")
             return {
                 'statusCode': 401,
                 'headers': cors_headers,
-                'body': json.dumps({'error': 'Unauthorized'})
+                'body': json.dumps({'error': 'Unauthorized - no user_id found'})
             }
 
-        print(f"Compressing data for user: {user_id}, Boards count: {len(new_boards)}")
+        logger.info(f"Processing compression for user: {user_id}")
 
 
-        # 4. Fetch Previous Compressed Data
-        # Assuming table 'user_analysis' has columns 'user_id' and 'compressed_data'
-        print("Fetching previous summary...")
-        response = supabase.from("user_analysis").select("compressed_data").eq("user_id", user_id).maybe_single()
+        # 4. Fetch Previous Compressed Data via REST
+        # Endpoint: GET /rest/v1/user_analysis?user_id=eq.{user_id}&select=compressed_data
+        logger.info("Fetching previous summary via REST...")
+        db_url = f"{SUPABASE_URL}/rest/v1/user_analysis"
+        
+        # ALWAYS use Service Key (SUPABASE_KEY) for DB calls to bypass RLS
+        # Ensure SUPABASE_KEY env var is the 'service_role' key.
+        # Strip whitespace just in case of copy-paste errors
+        service_key = SUPABASE_KEY.strip() if SUPABASE_KEY else ""
+        auth_token = service_key
+        
+        # Debug: Log the key prefix to verify provided key
+        key_prefix = auth_token[:15] + "..." if len(auth_token) > 15 else "SHORT"
+        logger.info(f"Using Auth Token Prefix: {key_prefix}")
+        
+        db_headers = {
+            "apikey": service_key,
+            "Authorization": f"Bearer {auth_token}"
+        }
+
+        params = {
+            "user_id": f"eq.{user_id}",
+            "select": "compressed_data"
+        }
+        
+        db_res = requests.get(db_url, headers=db_headers, params=params, timeout=10)
         
         prev_summary = ""
-        if response.data and response.data.get("compressed_data"):
-            prev_summary = response.data["compressed_data"]
-            print("Found previous summary.")
-        else:
-            print("No previous summary found (first compression).")
-
-        # 5. Call DeepSeek to Compress/Merge
-        print("Calling DeepSeek LLM...")
         
-        system_prompt = """You are a meticulous biographer and data archivist.
-Your task is to maintain a running "Compressed History" of a user's life based on their activity boards.
+        if db_res.ok:
+            rows = db_res.json()
+            if rows and len(rows) > 0:
+                prev_summary = rows[0].get("compressed_data", "")
+                logger.info(f"Found previous summary (length: {len(prev_summary)})")
+            else:
+                logger.info("No previous summary found.")
+        else:
+            logger.warning(f"DB Fetch Error: {db_res.status_code} {db_res.text}")
+            # Continue with empty summary
 
-You will be given:
-1. The CURRENT Compressed History (a summary of their past).
-2. A NEW BATCH of activity boards (recent events).
+        # 5. Call DeepSeek
+        logger.info("Calling DeepSeek LLM...")
+        system_prompt = """당신은 꼼꼼한 전기 작가이자 데이터 기록관입니다.
+당신의 임무는 사용자의 활동 보드를 기반으로 "압축된 인생 기록"을 유지하는 것입니다.
 
-Your Goal:
-Create an UPDATED Compressed History that seamlessly integrates the new events into the narrative.
+제공되는 데이터:
+1. 현재의 압축 기록 (과거의 요약).
+2. 새로운 활동 보드 묶음 (최근 사건들).
 
-Rules:
-- Preserve important long-term facts from the Current History.
-- Summarize the New Batch specific details (dates, key achievements) into the narrative.
-- Maintain a chronological flow.
-- Keep the tone professional but personal (like a life log).
-- The total output should be dense and information-rich, suitable for future analysis.
-- Do NOT lose key milestones.
+목표:
+새로운 사건들을 기존 서사에 자연스럽게 통합하여 업데이트된 압축 기록을 작성하세요.
+
+규칙:
+- **반드시 한국어로 작성하세요.**
+- 기존 기록의 중요한 장기적 사실을 보존하세요.
+- 새로운 보드의 세부 정보를 서사에 요약하여 추가하세요.
+- 시간 순서에 따른 흐름을 유지하세요.
+- 전문적이지만 개인적인 어조를 유지하세요.
+- 주요 이정표나 성과를 누락하지 마세요.
 """
-
         user_content = f"""
 === CURRENT COMPRESSED HISTORY ===
 {prev_summary if prev_summary else "(Empty - This is the start of the archive)"}
 
-=== NEW BATCH OF BOARDS (Top is most recent usually, but treat as a set) ===
+=== NEW BATCH OF BOARDS ===
 {json.dumps(new_boards, indent=2)}
 
 === INSTRUCTION ===
-Generate the UPDATED Compressed History now. Return ONLY the text of the history.
+업데이트된 압축 기록을 지금 생성하세요. 오직 기록의 텍스트만 반환하세요.
 """
-
         llm_payload = {
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content}
             ],
-            "model": "deepseek-chat", # or deepseek-reasoner depending on availability
-            "max_tokens": 4000, # Allow large context output
+            "model": "deepseek-chat",
+            "max_tokens": 4000,
             "temperature": 0.5
         }
-
+        
         llm_headers = {
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {DEEPSEEK_API_KEY}'
         }
 
-        llm_res = requests.post("https://api.deepseek.com/chat/completions", headers=llm_headers, json=llm_payload)
+        llm_res = requests.post("https://api.deepseek.com/chat/completions", headers=llm_headers, json=llm_payload, timeout=60)
         
         if not llm_res.ok:
-            raise Exception(f"DeepSeek API Error: {llm_res.text}")
+            logger.error(f"DeepSeek API Error: {llm_res.status_code} {llm_res.text}")
+            raise Exception(f"DeepSeek API Error: {llm_res.status_code} - {llm_res.text}")
 
-        new_summary = llm_res.json()['choices'][0]['message']['content']
-        print("Compression successful.")
+        llm_data = llm_res.json()
+        new_summary = llm_data['choices'][0]['message']['content']
+        logger.info(f"Compression successful. New summary length: {len(new_summary)}")
 
-        # 6. Update/Insert into Supabase
-        print("Updating user_analysis table...")
+
+        # 6. Update/Insert into Supabase via REST
+        logger.info("Updating user_analysis table via REST...")
         
-        # Check if row exists specifically to decide insert vs update (though upsert is better)
-        # Using upsert with user_id as conflict key
-        upsert_data = {
-            "user_id": user_id,
+        update_payload = {
             "compressed_data": new_summary,
-            "last_updated": "now()" # Optional, if column exists
+            "boards_since_last_compression": 15  # Reset to 15 (keep latest 15 boards uncompressed)
         }
         
-        # To avoid error if last_updated doesn't exist, I'll just upsert the two known columns
-        # If the user only made 'compressed_data' column.
-        # But usually Supabase requires all non-nullable columns.
-        # I'll try upserting just these.
+        update_headers = db_headers.copy()
+        update_headers["Content-Type"] = "application/json"
         
-        # Note: If 'user_analysis' has other columns, this might need adjustment.
-        # I'll assume standard upsert works.
+        # Use PATCH to update existing row
+        update_url = f"{db_url}?user_id=eq.{user_id}"
+        update_res = requests.patch(update_url, headers=update_headers, json=update_payload, timeout=10)
         
-        update_res = supabase.from("user_analysis").upsert(
-            {"user_id": user_id, "compressed_data": new_summary}, 
-            on_conflict="user_id"
-        ).execute()
+        if not update_res.ok:
+             logger.error(f"Update failed: {update_res.status_code} {update_res.text}")
+             raise Exception(f"Database update failed: {update_res.status_code} - {update_res.text}")
 
-        print("Database updated.")
+        logger.info("Database updated successfully.")
 
         return {
             'statusCode': 200,
@@ -171,9 +242,16 @@ Generate the UPDATED Compressed History now. Return ONLY the text of the history
         }
 
     except Exception as e:
-        print(f"ERROR: {str(e)}")
+        error_trace = traceback.format_exc()
+        logger.error(f"ERROR: {str(e)}")
+        logger.error(f"Stack trace: {error_trace}")
         return {
             'statusCode': 500,
             'headers': cors_headers,
-            'body': json.dumps({'error': str(e)})
+            'body': json.dumps({
+                'error': str(e),
+                'type': type(e).__name__,
+                'auth_prefix': key_prefix if 'key_prefix' in locals() else "Unknown",
+                'trace': error_trace.split('\n')[-3:-1]  # Last 2 lines of trace for context
+            })
         }

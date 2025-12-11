@@ -555,7 +555,8 @@ export default function App() {
                              description: item.description,
                              date: item.date,
                              tags: mappedTags,
-                             image: null
+                             image: null,
+                             waitForEmbedding: true
                           });
                           success++;
                       } catch (err) {
@@ -600,6 +601,14 @@ export default function App() {
                     .eq('user_id', user.id);
 
                   if (tagError) throw tagError;
+
+                  // Delete User Analysis (compression history)
+                  const { error: analysisError } = await supabase
+                    .from('user_analysis')
+                    .delete()
+                    .eq('user_id', user.id);
+
+                  if (analysisError) throw analysisError;
 
                   alert("모든 데이터가 삭제되었습니다");
                   window.location.reload();

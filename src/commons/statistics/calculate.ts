@@ -262,21 +262,21 @@ export interface StatHighlight {
 
 export function getRandomHighlights(stats: Statistics): StatHighlight[] {
   const pool: StatHighlight[] = [
-    { label: "Most Active Day", value: stats.habits.mostActiveDay },
-    { label: "Creation Streak", value: `${stats.habits.longestStreak} days` },
-    { label: "Orphaned Tags", value: stats.counts.orphanedTags },
-    { label: "Tag Density", value: stats.tags.density.toFixed(1) },
-    { label: "Total Boards", value: stats.counts.totalBoards },
-    { label: "Defined Tags", value: stats.counts.totalDefinedTags },
-    { label: "Rich Entries", value: stats.content.richEntries },
-    { label: "Avg Description", value: `${Math.round(stats.content.avgDescriptionLength)} chars` },
-    { label: "Weekend Activity", value: `${stats.habits.weekendPercentage}%`, type: 'percentage' },
+    { label: "가장 활발한 요일", value: stats.habits.mostActiveDay },
+    { label: "연속 기록", value: `${stats.habits.longestStreak}일` },
+    { label: "미사용 태그", value: stats.counts.orphanedTags },
+    { label: "태그 밀도", value: stats.tags.density.toFixed(1) },
+    { label: "총 보드 수", value: stats.counts.totalBoards },
+    { label: "생성된 태그 수", value: stats.counts.totalDefinedTags },
+    { label: "상세 기록", value: stats.content.richEntries },
+    { label: "평균 기록 길이", value: `${Math.round(stats.content.avgDescriptionLength)}자` },
+    { label: "주말 활동 비율", value: `${stats.habits.weekendPercentage}%`, type: 'percentage' },
   ];
 
   if (stats.content.commonKeywords.length > 0) {
     const word = stats.content.commonKeywords[0];
     const capitalized = word.charAt(0).toUpperCase() + word.slice(1);
-    pool.push({ label: "Top Keyword", value: capitalized });
+    pool.push({ label: "주요 키워드", value: capitalized });
   }
   
   // Only add if we have colors
@@ -284,7 +284,7 @@ export function getRandomHighlights(stats: Statistics): StatHighlight[] {
   //   pool.push({ label: "Favorite Type", value: "Color", type: 'color' }); // Needs UI support
   // }
 
-  // Randomly shuffle and pick 2
+  // Randomly shuffle and pick 3
   const shuffled = pool.sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, 2);
+  return shuffled.slice(0, 3);
 }

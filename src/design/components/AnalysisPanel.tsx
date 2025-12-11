@@ -13,8 +13,6 @@ import { parseISO, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { Search, X } from "lucide-react";
 
 interface AnalysisData {
-  fact1: string;
-  fact2: string;
   analysis: string;
 }
 
@@ -50,6 +48,7 @@ export function AnalysisPanel({
   const [randomStats, setRandomStats] = useState<StatHighlight[] | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilters, setActiveFilters] = useState<QueryFilters | null>(null);
+  const [isUserQuery, setIsUserQuery] = useState(false); // Track if this is a user query vs general analysis
 
   // Filter boards based on active filters
   const getFilteredBoards = () => {
@@ -94,121 +93,123 @@ export function AnalysisPanel({
     setIsLoading(true);
     setAnalysisData(null); // Clear previous analysis
 
-    // 1. Process Query if exists
-    let currentFilters = activeFilters;
-    let boardsToAnalyze = boards;
+    // Determine if this is a user query or general analysis
+    const hasUserQuery = searchQuery.trim().length > 0;
+    setIsUserQuery(hasUserQuery);
 
-    if (searchQuery.trim() && !activeFilters) {
+    let boardsToAnalyze = boards;
+    let currentFilters = activeFilters;
+
+    // === USER QUERY PATH: Use RAG + Agentic Filtering ===
+    if (hasUserQuery) {
+      // 1. Process Query
+      if (!activeFilters) {
         setIsSearching(true);
         try {
-            const filters = await fetchQueryParsing(searchQuery);
-            if (filters) {
-                console.log("Applied Filters:", filters);
-                setActiveFilters(filters);
-                currentFilters = filters;
-            }
+          const filters = await fetchQueryParsing(searchQuery);
+          if (filters) {
+            console.log("Applied Filters:", filters);
+            setActiveFilters(filters);
+            currentFilters = filters;
+          }
         } catch (e) {
-            console.error(e);
+          console.error(e);
         } finally {
-            setIsSearching(false);
+          setIsSearching(false);
         }
-    }
-    
-    // 2. Filter Boards (Hybrid: Logic + Vector)
-    if (currentFilters) {
+      }
+      
+      // 2. Filter Boards (Hybrid: Logic + Vector)
+      if (currentFilters) {
         // A. Logic Filtering (Date & Tags)
         boardsToAnalyze = boards.filter((board) => {
-            if (currentFilters?.startDate && currentFilters?.endDate && board.date) {
-                const boardDate = parseISO(board.date);
-                const start = startOfDay(parseISO(currentFilters.startDate));
-                const end = endOfDay(parseISO(currentFilters.endDate));
-                if (!isWithinInterval(boardDate, { start, end })) return false;
-            }
-            if (currentFilters?.tags?.length) {
-                const boardTagNames = board.tags.map(t => t.tag_name.toLowerCase());
-                if (!currentFilters.tags.some(t => boardTagNames.includes(t.toLowerCase()))) return false;
-            }
-            if (currentFilters?.daysOfWeek && currentFilters.daysOfWeek.length > 0 && board.date) {
-                const day = parseISO(board.date).getDay();
-                if (!currentFilters.daysOfWeek.includes(day)) return false;
-            }
-            // hasImage is not currently supported by BoardWithTags fully unless we check image_url presence or content.
-            // BoardWithTags has optional 'image_url'. but typically it's loaded only when viewing?
-            // Wait, readBoardsWithTags returns board which has 'image_url' if we modify the db query.
-            // Actually 'readBoardsWithTags' in db.ts DOES NOT include image_url by default in the select?
-            // Checking db.ts... readBoardsWithTags SELECT does not include 'image_url' or joining with storage?
-            // Ah, readBoardsWithTagsAndImages does. But boards passed here might be just metadata.
-            // However, BoardWithTags type has optional image_url.
-            // If the user wants to filter by image, we might need to assume if image_url is present or check description for [Image].
-            // For now, let's assume if the user asks for images, we only show boards that *might* have them.
-            // Since we can't be sure without fetching, strict filtering might hide everything.
-            // Let's check if 'image_url' property exists on board object.
-            if (currentFilters?.hasImage === true) {
-                 // Weak check: if we don't have image info, maybe skip?
-                 // Or we can check if description contains "image" or "photo" as a fallback?
-                 // Let's STRICTLY check the property if available.
-                 if (!board.image_url) return false; 
-            }
-
-            return true;
+          if (currentFilters?.startDate && currentFilters?.endDate && board.date) {
+            const boardDate = parseISO(board.date);
+            const start = startOfDay(parseISO(currentFilters.startDate));
+            const end = endOfDay(parseISO(currentFilters.endDate));
+            if (!isWithinInterval(boardDate, { start, end })) return false;
+          }
+          if (currentFilters?.tags?.length) {
+            const boardTagNames = board.tags.map(t => t.tag_name.toLowerCase());
+            if (!currentFilters.tags.some(t => boardTagNames.includes(t.toLowerCase()))) return false;
+          }
+          if (currentFilters?.daysOfWeek && currentFilters.daysOfWeek.length > 0 && board.date) {
+            const day = parseISO(board.date).getDay();
+            if (!currentFilters.daysOfWeek.includes(day)) return false;
+          }
+          if (currentFilters?.hasImage === true) {
+            if (!board.image_url) return false; 
+          }
+          return true;
         });
 
         // B. Semantic Filtering (Keywords -> Vector Search)
-        // If we have keywords OR just a general query without structured filters, use Vector Search
-        // But for now, let's trigger it if keywords were detected by the Router.
-        // Actually, if the Router found "keywords", it means the user wants to search for content.
-        // Instead of string matching, we use the VECTOR SEARCH now.
         if (currentFilters.keywords && currentFilters.keywords.length > 0) {
-             setIsSearching(true);
-             try {
-                // Use the original query or the keywords?
-                // Using the full original query gives better context to VoyageAI 
-                // than just disconnected keywords like ["coding", "hard"].
-                // So we pass 'searchQuery' (which might be "what did I say about coding being hard?").
-                const semanticBoardIds = await fetchSemanticSearchBoards(searchQuery);
-                
-                if (semanticBoardIds) {
-                    const semanticIdSet = new Set(semanticBoardIds);
-                    // Intersect logic results with vector results
-                    boardsToAnalyze = boardsToAnalyze.filter(b => semanticIdSet.has(b.board_id));
-                }
-             } catch (e) {
-                 console.error("Vector search error", e);
-             } finally {
-                 setIsSearching(false);
-             }
+          setIsSearching(true);
+          try {
+            const semanticBoardIds = await fetchSemanticSearchBoards(searchQuery);
+            if (semanticBoardIds) {
+              const semanticIdSet = new Set(semanticBoardIds);
+              boardsToAnalyze = boardsToAnalyze.filter(b => semanticIdSet.has(b.board_id));
+            }
+          } catch (e) {
+            console.error("Vector search error", e);
+          } finally {
+            setIsSearching(false);
+          }
         }
-    }
+      }
 
-    // 3. Sorting and Limiting
-    if (activeFilters?.sort) {
-        if (activeFilters.sort === 'newest') {
-             boardsToAnalyze.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
-        } else if (activeFilters.sort === 'oldest') {
-             boardsToAnalyze.sort((a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime());
-        } else if (activeFilters.sort === 'random') {
-             boardsToAnalyze.sort(() => Math.random() - 0.5);
+      // 3. Sorting and Limiting
+      if (currentFilters?.sort) {
+        if (currentFilters.sort === 'newest') {
+          boardsToAnalyze.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+        } else if (currentFilters.sort === 'oldest') {
+          boardsToAnalyze.sort((a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime());
+        } else if (currentFilters.sort === 'random') {
+          boardsToAnalyze.sort(() => Math.random() - 0.5);
         }
-    }
+      }
 
-    if (activeFilters?.limit && activeFilters.limit > 0) {
-        boardsToAnalyze = boardsToAnalyze.slice(0, activeFilters.limit);
-    }
+      if (currentFilters?.limit && currentFilters.limit > 0) {
+        boardsToAnalyze = boardsToAnalyze.slice(0, currentFilters.limit);
+      }
 
-    if (boardsToAnalyze.length === 0) {
-        setRandomStats([{ label: "Result", value: "No boards found matching your query." }]);
+      if (boardsToAnalyze.length === 0) {
+        setRandomStats(null);
+        setAnalysisData({
+          analysis: "관련 정보를 찾을 수 없었습니다"
+        });
         setIsLoading(false);
         return;
+      }
+
+      // Hide stats for user queries
+      setRandomStats(null);
+    } 
+    // === GENERAL ANALYSIS PATH: No filtering, fetchAnalysis will handle board filtering ===
+    else {
+      // For general analysis, pass ALL boards
+      // fetchAnalysis will filter based on last_compressed_at
+      boardsToAnalyze = boards;
+      
+      // Calculate and show stats for general analysis
+      const stats: Statistics = calculateStatistics(boardsToAnalyze, tags);
+      const highlights: StatHighlight[] = getRandomHighlights(stats);
+      setRandomStats(highlights);
     }
 
+    // Stats are already calculated in each branch above
+    // For user query: calculated on filtered boards
+    // For general analysis: calculated on all boards (will be filtered in fetchAnalysis)
     const stats: Statistics = calculateStatistics(boardsToAnalyze, tags);
     const highlights: StatHighlight[] = getRandomHighlights(stats);
-    setRandomStats(highlights);
 
     console.log(highlights);
 
     try {
-      const data = await fetchAnalysis(boardsToAnalyze);
+      // Pass isUserQuery flag to fetchAnalysis
+      const data = await fetchAnalysis(boardsToAnalyze, stats, highlights, hasUserQuery);
       if (data) {
         setAnalysisData(data);
       }
@@ -225,6 +226,7 @@ export function AnalysisPanel({
       setSearchQuery("");
       setAnalysisData(null);
       setRandomStats(null);
+      setIsUserQuery(false);
   };
 
   return (
@@ -352,9 +354,12 @@ export function AnalysisPanel({
                 {isSearching ? "질문 분석 중..." : "데이터 분석 중..."}
               </span>
             </div>
-          ) : analysisData && randomStats ? (
+          ) : analysisData ? (
             // Analysis Results
             <>
+              {/* Stats - Only show for general analysis, not user queries */}
+              {randomStats && (
+                <>
               {/* Fact 1 */}
               <div>
                 <div className="flex items-center gap-2 mb-2 border-b border-black pb-1">
@@ -410,6 +415,36 @@ export function AnalysisPanel({
                   {randomStats[1].value}
                 </div>
               </div>
+
+              {/* Fact 3 */}
+              <div>
+                <div className="flex items-center gap-2 mb-2 border-b border-black pb-1">
+                  <BarChart3 size={14} strokeWidth={1.5} />
+                  <span
+                    style={{
+                      // [UI 규칙] IBM Plex Mono + Pretendard
+                      fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
+                      fontSize: "11px",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    {randomStats[2].label}
+                  </span>
+                </div>
+                <div
+                  className="border border-black bg-white p-3"
+                  style={{
+                    // [본문 규칙] IBM Plex Mono + Pretendard
+                    fontFamily: "'IBM Plex Mono', 'Pretendard', monospace",
+                    fontSize: "13px",
+                    lineHeight: "1.6",
+                  }}
+                >
+                  {randomStats[2].value}
+                </div>
+              </div>
+              </>
+              )}
 
               {/* Analysis Summary */}
               <div>

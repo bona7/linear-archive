@@ -3,9 +3,16 @@ import { supabase } from "@/commons/libs/supabase/client";
 import {
   BoardWithTags,
   readBoardsWithTags,
+  getUserAnalysis,
 } from "../libs/supabase/db";
+import { Statistics, StatHighlight } from "./calculate";
 
-export const fetchAnalysis = async (boards: BoardWithTags[]) => {
+export const fetchAnalysis = async (
+  boards: BoardWithTags[], 
+  statistics: Statistics,
+  randomMetrics: StatHighlight[],
+  isUserQuery: boolean = false // NEW: flag to indicate if this is a user query
+) => {
   try {
     const session = await getSession();
 
@@ -13,12 +20,75 @@ export const fetchAnalysis = async (boards: BoardWithTags[]) => {
       throw new Error("No session available for analysis call");
     }
 
-    // const boards = await readBoardsWithTags();
+    // Fetch history (compressed_data) and board counter
+    const analysisData = await getUserAnalysis();
+    const history = analysisData?.compressed_data || "";
+    const boardsSinceCompression = analysisData?.boards_since_last_compression ?? 0;
+    
+    console.log("=== RAG Analysis Data Fetched ===");
+    console.log("Total Boards Available:", boards.length);
+    console.log("User History Length:", history?.length || 0);
+    console.log("Boards Since Last Compression:", boardsSinceCompression);
+    console.log("Is User Query:", isUserQuery);
 
-    if (boards.length === 0) {
+    // For GENERAL ANALYSIS (분석/재분석): Only send boards since last compression
+    // For USER QUERY: boards are already filtered by RAG logic in AnalysisPanel
+    let boardsToSend = boards;
+    
+    if (!isUserQuery) {
+      if (boardsSinceCompression > 0) {
+        // Send only the most recent N boards where N = boards_since_last_compression
+        // Boards are already sorted by date descending in readBoardsWithTags
+        boardsToSend = boards.slice(0, boardsSinceCompression);
+        
+        console.log("Boards to analyze (since last compression):", boardsToSend.length);
+        console.log("Boards sample (first 3):", boardsToSend.slice(0, 3));
+      } else {
+        // Counter is 0: Either first-time analysis or all boards already compressed
+        // For first-time analysis, analyze all boards
+        // For subsequent analyses after compression, there are no new boards
+        if (boards.length > 0 && !history) {
+          // First-time analysis: no history exists, analyze all boards
+          console.log("First-time analysis: analyzing all", boards.length, "boards");
+          boardsToSend = boards;
+        } else {
+          // All boards already compressed, no new boards to analyze
+          console.log("No new boards since last compression");
+          return null;
+        }
+      }
+    } else {
+      console.log("Using filtered boards from RAG:", boardsToSend.length);
+    }
+
+    if (boardsToSend.length === 0) {
       console.log("No boards to analyze");
       return null;
     }
+
+    console.log("Statistics:", statistics);
+    console.log("Random Metrics:", randomMetrics);
+
+    // Build payload conditionally
+    // For USER QUERY RAG: Only send boards and history (no stats/metrics)
+    // For GENERAL ANALYSIS: Send boards, stats, metrics, and history
+    const payload: any = {
+      boards: boardsToSend,
+      history: history || ""
+    };
+
+    if (!isUserQuery) {
+      // Only include stats and metrics for general analysis
+      payload.statistics = statistics;
+      payload.metrics = randomMetrics;
+    }
+
+    console.log("Sending to Analysis API:");
+    console.log("  - Boards:", boardsToSend.length, "items");
+    console.log("  - Metrics included:", !isUserQuery);
+    console.log("  - Statistics included:", !isUserQuery);
+    console.log("  - History included:", !!history);
+    console.log("Full Payload:", JSON.stringify(payload, null, 2));
 
     const response = await fetch(
       "https://4iy42lphh8.execute-api.ap-northeast-2.amazonaws.com/dev/deepseek/analysis",
@@ -28,9 +98,7 @@ export const fetchAnalysis = async (boards: BoardWithTags[]) => {
           Authorization: `Bearer ${session.access_token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          boards: boards,
-        }),
+        body: JSON.stringify(payload),
       }
     );
 
@@ -142,30 +210,7 @@ export const fetchSemanticSearchBoards = async (query: string): Promise<string[]
     
     console.log("Vector Search Results:", parsed);
 
-    if (parsed.boards) {
-        // Return descriptions or IDs? The current logic searches in Supabase and returns 'description', 'date', 'tags'
-        // But we need to match them back to client-side boards.
-        // The lambda currently DOES NOT return board_id. We need to fix that or fuzzy match.
-        // It's safer to rely on content, BUT let's assume we map by (date + description).
-        // For now, let's just return descriptors to debug.
-        // WAIT: The best way is to update 'match_boards_updated.sql' to return board_id, 
-        // AND update lambda to return it.
-        // Note: The 'match_boards' function ALREADY returns board_id!
-        // The lambda just needs to include it in the response.
-        
-        // Assuming I fixed the lambda to return full objects including IDs?
-        // Actually, looking at my previous lambda edit, I only returned date/desc/tags in 'relevant_boards'.
-        // The 'relevant_boards' variable in lambda comes from 'similarity_response.data'.
-        // If 'match_boards' returns board_id, then similarity_response.data has it.
-        // So I just need to make sure the lambda passes it through.
-        
-        // In the lambda:
-        // boards_dict = { ... } (used for LLM context)
-        // But for 'search_only' I returned 'relevant_boards' directly.
-        // 'relevant_boards' is the raw list from supabase.rpc.
-        // Supabase RPC 'match_boards' returns table (board_id uuid, ...).
-        // So yes, board_id IS in the response!
-        
+    if (parsed.boards) {        
         return parsed.boards.map((b: any) => b.board_id);
     }
     return [];
@@ -176,7 +221,7 @@ export const fetchSemanticSearchBoards = async (query: string): Promise<string[]
   }
 }
 
-export const triggerDataCompression = async (boards: any[]): Promise<any> => {
+export const triggerDataCompression = async (boards: any[], userId: string): Promise<any> => {
   try {
     const session = await getSession();
 
@@ -185,16 +230,15 @@ export const triggerDataCompression = async (boards: any[]): Promise<any> => {
     }
 
     const response = await fetch(
-      "https://tuhvcir4psw7qm7o5utqjasjky0uxgyr.lambda-url.ap-northeast-2.on.aws/",
+      "/api/proxy-compression",
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           access_token: session.access_token,
-          refresh_token: session.refresh_token,
+          user_id: userId,
           boards: boards
         }),
       }

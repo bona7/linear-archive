@@ -54,7 +54,7 @@ def lambda_handler(event, context):
                 "messages": [
                     {
                         "role": "system",
-                        "content": f"""You are a precise query parser. Your job is to extract search filters from the user's natural language query.
+                        "content": f"""You are a precise query parser. Your job is to extract search filters from the user's natural language query (which may be in Korean or English).
 Current Date: {current_date}
 
 Return a JSON object with these fields:
@@ -70,14 +70,14 @@ Return a JSON object with these fields:
 }}
 
 Rules:
-1. Handle date ranges: "from Jan 1 to Feb 1" -> startDate: "2024-01-01", endDate: "2024-02-01".
-2. Handle relative dates: "last week" -> calculate range based on Current Date. "yesterday" -> specific date.
-3. Handle tags: If user mentions "work tag" or "#work", extract "work".
-4. Handle specific text: "boards about coding" -> keywords: ["coding"].
-5. Days: "What do I do on Mondays?" -> daysOfWeek: [1]. "Weekends" -> [0, 6].
-6. Images: "Show me photos/pictures" -> hasImage: true.
-7. Sort/Limit: "Last 5 boards" -> sort: "newest", limit: 5. "Random 2 memories" -> sort: "random", limit: 2.
-8. If the user asks for "what i did", "summary", "analysis" without specific constraints, return null for all fields.
+1. Handle date ranges: "1월 1일부터 2월 1일까지" -> startDate: "2024-01-01", endDate: "2024-02-01".
+2. Handle relative dates: "지난주", "저번주" -> calculate range. "어제" -> specific date.
+3. Handle tags: "운동 태그", "#운동" -> tags: ["운동"].
+4. Handle specific text: "코딩 관련 보드" -> keywords: ["코딩"].
+5. Days: "월요일에 뭐했지?" -> daysOfWeek: [1]. "주말" -> [0, 6].
+6. Images: "사진 보여줘" -> hasImage: true.
+7. Sort/Limit: "최근 5개" -> sort: "newest", limit: 5. "랜덤 2개" -> sort: "random", limit: 2.
+8. If the user asks for "summary", "analysis", "요약", "분석" without specific constraints, return null for all fields.
 9. Return format must be valid JSON."""
                     },
                     {
@@ -118,50 +118,48 @@ Rules:
             history = event.get("history", "")
             history_context = ""
             if history:
-                 history_context = f"\n\n=== USER'S LONG-TERM HISTORY (Context only) ===\n{history}\n\n(Use this history to understand their long-term growth, but focus your specific feedback on the NEW ACTIVITY BOARDS below.)"
+                 history_context = f"\n\n=== 사용자의 장기 기록 (참고용) ===\n{history}\n\n(이 기록은 장기적인 성장을 이해하는 데 참고하되, 아래의 새로운 활동 보드에 집중해서 피드백을 주세요.)"
+
+            # Extract Metrics
+            metrics = event.get("metrics", [])
+            metrics_context = ""
+            if metrics:
+                metrics_list = "\n".join([f"- {m.get('label', 'Metric')}: {m.get('value', 'N/A')}" for m in metrics])
+                metrics_context = f"\n\n=== 주요 하이라이트 (랜덤 선택됨) ===\n{metrics_list}\n\n(이 수치들을 자연스럽게 이야기에 녹여내어 데이터에 기반한 칭찬을 해주세요.)"
 
             # Prepare Deepseek API request for Analysis
             payload = {
                 "messages": [
                     {
-                        "content": f"""You are an enthusiastic personal life coach analyzing someone's activity boards. Your job is to make them feel proud of what they've accomplished and excited about their progress.
+                        "content": f"""당신은 열정적인 퍼스널 라이프 코치이자 데이터 스토리텔러입니다.
     {history_context}
+    {metrics_context}
     
-    Respond with a JSON object in this format:
+    Respond with a JSON object containing a SINGLE field "analysis":
     {{
-      "fact1": "An exciting discovery about their recent activities (with specific numbers)",
-      "fact2": "Another interesting pattern or achievement (with specific numbers)",
-      "analysis": "A warm, encouraging 2-3 sentence message directly to them"
+      "analysis": "사용자의 최근 활동을 요약하는 따뜻하고 격려가 담긴 3-5문장의 하나의 완성된 문단 (한국어)."
     }}
     
     Guidelines:
-    - Write in second person ("you", "your") - never third person
-    - Be enthusiastic and positive about their activities
-    - Point out interesting patterns or themes in what they're documenting
-    - Make specific references to their actual data (dates, tags, descriptions)
-    - Sound like a supportive friend, not a robot
-    - If History is provided, mention how their recent work connects to their larger journey (e.g., "You're continuing your streak in...")
+    - **반드시 한국어로 작성하세요.**
+    - 사용자에게 직접 말하듯이 ("해요체" 사용, 예: "했어요", "좋네요") 친근하게 작성하세요.
+    - 위에 제공된 **주요 하이라이트(Metrics)**를 자연스럽게 이야기에 포함시키세요. 단순히 나열하지 말고, 이것이 왜 멋진지 설명하세요.
+    - 활동 보드에서 발견된 패턴을 요약하세요.
+    - 열정적이고 전문적인 톤을 유지하세요.
+    - "Fact 1", "Fact 2" 등으로 나누지 말고, 하나의 흐르는 문단으로 작성하세요.
     
-    CRITICAL ANTI-HALLUCINATION RULES:
-    1. Do NOT invent concepts, projects, or activities that are not explicitly in the provided JSON data.
-    2. If the data is too sparse (tags only, no descriptions) or empty to form a patterned insight, generally admit "I see you were active, but I need more details to give specific praise" in the analysis.
-    3. If there are no distinctive facts for "fact1" or "fact2", return "Not enough data" for those fields. Do NOT fake a statistic.
-    4. Only reference specific dates or tags if they actually exist in the input.""",
+    CRITICAL:
+    - Return ONLY valid JSON.
+    - The "analysis" field must contain the ENTIRE message string in Korean.
+    - Do not hallucinate data not present in Boards or Highlights.""",
                         "role": "system"
                     },
                     {
-                        "content": f"""Look at what this person has been documenting on their boards and give them some exciting insights:
+                        "content": f"""최근 활동 보드 데이터입니다:
     
     {json.dumps(boards, indent=2)}
     
-    Make them feel good about their activities! Focus on:
-    - What they've been working on or experiencing
-    - Any cool patterns or themes you notice
-    - How active they've been
-    - Specific accomplishments or moments they've captured
-    
-    Be warm, personal, and enthusiastic. Use "you" and "your" throughout.
-    Return ONLY valid JSON, no markdown or extra text.""",
+    데이터를 분석하고 격려의 메시지를 한국어로 작성해주세요.""",
                         "role": "user"
                     }
                 ],
@@ -233,8 +231,6 @@ Rules:
                 }
             
             analysis_json = {
-                "fact1": "Unable to parse analysis",
-                "fact2": "Unable to parse analysis",
                 "analysis": content
             }
             return {
