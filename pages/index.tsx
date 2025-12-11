@@ -139,6 +139,11 @@ export default function App() {
 
   useEffect(() => {
     checkUser();
+    // Expose backfill tool to console
+    import("@/utils/backfill-has-image").then((mod) => {
+        (window as any).backfillHasImage = mod.backfillHasImage;
+        console.log("backfillHasImage helper loaded. Run window.backfillHasImage() to populate has_image column.");
+    });
   }, []);
 
   useEffect(() => {

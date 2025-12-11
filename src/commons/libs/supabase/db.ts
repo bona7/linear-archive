@@ -9,6 +9,7 @@ export interface Board {
   user_id: string;
   description: string | null;
   date: string | null;
+  has_image: boolean; // Added
 }
 
 export interface Tag {
@@ -92,6 +93,7 @@ export async function createBoard(params: CreateBoardParams) {
           description: params.description || null,
           date: params.date || null,
           time: params.time || null, // Insert time
+          has_image: !!params.image, // Set has_image
         },
       ])
       .select()
@@ -253,6 +255,7 @@ export async function createBoard(params: CreateBoardParams) {
       ...boardData,
       tags: tagsData || [],
       image_url: imageUrl,
+      has_image: !!params.image, // Ensure return type correctness
     } as BoardWithTags;
   } catch (error: any) {
     // 에러 발생 시 롤백 처리
@@ -321,6 +324,7 @@ export async function readBoardsWithTags(): Promise<BoardWithTags[]> {
       user_id: board.user_id,
       description: board.description,
       date: board.date,
+      has_image: board.has_image || false, // Handle null/undefined as false
       tags: tags,
     };
   });
@@ -407,6 +411,7 @@ export async function readBoardById(
     user_id: data.user_id,
     description: data.description,
     date: data.date,
+    has_image: data.has_image || false, // Handle null
     tags: tags,
   };
 
@@ -536,6 +541,12 @@ export async function updateBoard(
       postUuid: boardId,
       userId: user.id,
     });
+    
+    // Update has_image status flag
+    await supabase
+      .from("board")
+      .update({ has_image: true })
+      .eq("board_id", boardId);
   }
 }
 

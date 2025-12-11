@@ -11,6 +11,7 @@ import { fetchAnalysis, fetchQueryParsing, QueryFilters, fetchSemanticSearchBoar
 import { StatHighlight, Statistics, calculateStatistics, getRandomHighlights } from "@/commons/statistics/calculate";
 import { parseISO, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { Search, X } from "lucide-react";
+import { getPostImageUrl } from "@/commons/libs/supabase/storage";
 
 interface AnalysisData {
   analysis: string;
@@ -121,7 +122,7 @@ export function AnalysisPanel({
       
       // 2. Filter Boards (Hybrid: Logic + Vector)
       if (currentFilters) {
-        // A. Logic Filtering (Date & Tags)
+        // A. Logic Filtering (Date & Tags & Image)
         boardsToAnalyze = boards.filter((board) => {
           if (currentFilters?.startDate && currentFilters?.endDate && board.date) {
             const boardDate = parseISO(board.date);
@@ -138,7 +139,7 @@ export function AnalysisPanel({
             if (!currentFilters.daysOfWeek.includes(day)) return false;
           }
           if (currentFilters?.hasImage === true) {
-            if (!board.image_url) return false; 
+            if (!board.has_image) return false;
           }
           return true;
         });
