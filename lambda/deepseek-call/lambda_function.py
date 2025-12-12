@@ -73,7 +73,7 @@ def lambda_handler(event, context):
         print(f"User query received: '{user_query}'")
 
         try:
-            result = vo.embed(texts=[user_query], input_type="query", output_dimension=1024, model="voyage-3.5-lite")
+            result = vo.embed(texts=[user_query], input_type="query", model="voyage-3")
             combined_embedding = result.embeddings[0]
 
             print(f"Embedding generated successfully, dimension: {len(combined_embedding)}")
@@ -91,7 +91,7 @@ def lambda_handler(event, context):
             similarity_response = supabase.rpc("match_boards", {
                 "query_embedding": combined_embedding,
                 "query_user_id": event.get("user_id"),
-                "match_threshold": 0.75,
+                "match_threshold": 0.0,  # No threshold for debugging
                 "match_count": 20
             }).execute()
 
@@ -147,12 +147,6 @@ def lambda_handler(event, context):
             if isinstance(deepseek_messages, list):
                 deepseek_messages.insert(0, context_message)
             else:
-                 # Handle case where user_query might be a list or object, though typically string
-                 # But based on initial code, user_query was passed directly to messages which is wrong for chat completion if it's just a string?
-                 # Wait, looking at lines 138: "messages": deepseek_messages
-                 # If user_query is a string, deepseek_messages = user_query. This is invalid for chat API.
-                 # It should be [{"role": "user", "content": user_query}]
-                 # Fixing this bug as well while here.
                  deepseek_messages = [{"role": "user", "content": str(user_query)}]
                  deepseek_messages.insert(0, context_message)
 

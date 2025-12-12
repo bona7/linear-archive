@@ -278,11 +278,6 @@ export function getRandomHighlights(stats: Statistics): StatHighlight[] {
     const capitalized = word.charAt(0).toUpperCase() + word.slice(1);
     pool.push({ label: "주요 키워드", value: capitalized });
   }
-  
-  // Only add if we have colors
-  // if (stats.tags.topColors.length > 0) {
-  //   pool.push({ label: "Favorite Type", value: "Color", type: 'color' }); // Needs UI support
-  // }
 
   // Randomly shuffle and pick 3
   const shuffled = pool.sort(() => 0.5 - Math.random());

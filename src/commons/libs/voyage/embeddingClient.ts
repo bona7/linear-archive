@@ -13,8 +13,6 @@ export async function CallEmbedding(input: EmbeddingInput) {
   if (!session) throw new Error("No session available");
 
   const payload = {
-    access_token: session.access_token,
-    refresh_token: session.refresh_token,
     user_id: input.user_id,
     board_id: input.board_id,
     image: input.image,

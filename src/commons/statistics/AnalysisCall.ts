@@ -180,10 +180,9 @@ export const fetchSemanticSearchBoards = async (query: string): Promise<string[]
       throw new Error("No session available for semantic search");
     }
 
-    // deepseek_test is the lambda that handles embedding + vector search
-    // We now use task='search_only' to get just the boards
+    // Similarity search Lambda endpoint
     const response = await fetch(
-      "https://4iy42lphh8.execute-api.ap-northeast-2.amazonaws.com/dev/deepseek/embedding",
+      "https://4iy42lphh8.execute-api.ap-northeast-2.amazonaws.com/dev/deepseek/similarity-search",
       {
         method: "POST",
         headers: {
