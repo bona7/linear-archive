@@ -226,8 +226,8 @@ export async function createBoard(params: CreateBoardParams) {
             board_tag_jointable (tags (tag_name))
           `)
           .eq('user_id', userId)
-          .order('date', { ascending: false })
-          .range(15, 29); // Fetch 15 boards starting from index 15
+          .order('created_at', { ascending: false }) // Use created_at for strict chronological order
+          .range(15, counter - 1); // Fetch from 16th (index 15) to current count (index counter-1)
         
         if (error) {
           console.error("[Compression] Failed to fetch boards:", error);
