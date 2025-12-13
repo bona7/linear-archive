@@ -1,6 +1,7 @@
 import { supabase } from "./client";
 import { uploadPostImage, getPostImageUrl } from "./storage";
-import { getSession } from "./auth";
+import { CallEmbedding } from "../voyage/embeddingClient";
+import { triggerDataCompression } from "../../statistics/AnalysisCall";
 
 // 타입 정의
 export interface Board {
@@ -8,7 +9,7 @@ export interface Board {
   user_id: string;
   description: string | null;
   date: string | null;
-  time: string | null;
+  has_image: boolean; // Added
 }
 
 export interface Tag {
@@ -31,12 +32,13 @@ export interface BoardWithTags extends Board {
 export interface CreateBoardParams {
   description?: string;
   date?: string;
-  time?: string;
+  time?: string; // Added time
   tags: Array<{
     tag_name: string;
     tag_color: string;
   }>;
-  image?: File;
+  image?: File | null; // Allow null explicity
+  waitForEmbedding?: boolean;
 }
 
 /**
@@ -46,11 +48,14 @@ export interface CreateBoardParams {
  */
 export async function createBoard(params: CreateBoardParams) {
   // 1. 현재 사용자 ID 가져오기
-  const session = await getSession();
-  if (!session?.user) {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
     throw new Error("User not authenticated");
   }
-  const userId = session.user.id;
+  const userId = user.id;
 
   // 2. board_id 미리 생성 (이미지 업로드에 사용)
   const boardId = crypto.randomUUID();
@@ -87,7 +92,8 @@ export async function createBoard(params: CreateBoardParams) {
           user_id: userId,
           description: params.description || null,
           date: params.date || null,
-          time: params.time || null,
+          time: params.time || null, // Insert time
+          has_image: !!params.image, // Set has_image
         },
       ])
       .select()
@@ -166,10 +172,90 @@ export async function createBoard(params: CreateBoardParams) {
       .select("*")
       .in("tag_id", tagIds);
 
+    // 8. embedding lambda call
+    const tagNamesStr = (params.tags ?? [])
+      .map((t) => t.tag_name)
+      .filter(Boolean)
+      .join(", ");
+
+    const embeddingPromise = CallEmbedding({
+      user_id: userId,
+      board_id: boardId,
+      image: imageUrl ?? null,
+      description: params.description ?? "",
+      tags: tagNamesStr ?? "",
+      date: params.date ?? Date.now().toString(),
+    });
+
+    if (params.waitForEmbedding) {
+      try {
+        await embeddingPromise;
+        console.log(`Embedding created for board ${boardId}`);
+      } catch (embedErr: any) {
+        console.error(`Embedding FAILED for board ${boardId}:`, embedErr.message);
+        // Don't throw - board was created successfully, just embedding failed
+      }
+    } else {
+      embeddingPromise
+        .then(() => {
+          console.log(`Embedding created for board ${boardId}`);
+        })
+        .catch((embedErr: any) => {
+          console.error(`Embedding FAILED for board ${boardId}:`, embedErr.message);
+          console.error("Full error:", embedErr);
+        });
+    }
+
+    // 9. INCREMENT BOARD COUNTER AND CHECK FOR COMPRESSION TRIGGER
+    incrementBoardCounter().then(async () => {
+      // Check current counter value
+      const analysisData = await getUserAnalysis();
+      const counter = analysisData?.boards_since_last_compression ?? 0;
+      
+      console.log(`[Compression] Board counter: ${counter}`);
+      
+      if (counter >= 30) {
+        console.log(`[Compression] Counter reached ${counter}. Triggering compression for boards 16-30...`);
+        
+        // Fetch boards 16-30 (indices 15-29) to compress
+        // Keep the latest 15 boards (indices 0-14) uncompressed
+        const { data, error } = await supabase.from('board')
+          .select(`
+            description, 
+            date, 
+            board_tag_jointable (tags (tag_name))
+          `)
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false }) // Use created_at for strict chronological order
+          .range(15, counter - 1); // Fetch from 16th (index 15) to current count (index counter-1)
+        
+        if (error) {
+          console.error("[Compression] Failed to fetch boards:", error);
+          return;
+        }
+        
+        if (data && data.length > 0) {
+          console.log(`[Compression] Compressing ${data.length} boards...`);
+          
+          // Clean up structure for AI
+          const cleanParams = data.map((b: any) => ({
+            description: b.description,
+            date: b.date,
+            tags: b.board_tag_jointable?.map((bt: any) => bt.tags?.tag_name).filter(Boolean) || []
+          }));
+          
+          triggerDataCompression(cleanParams, userId);
+        }
+      }
+    }).catch(err => {
+      console.error("[Compression] Counter increment failed:", err);
+    });
+
     return {
       ...boardData,
       tags: tagsData || [],
       image_url: imageUrl,
+      has_image: !!params.image, // Ensure return type correctness
     } as BoardWithTags;
   } catch (error: any) {
     // 에러 발생 시 롤백 처리
@@ -197,8 +283,12 @@ export async function createBoard(params: CreateBoardParams) {
  */
 export async function readBoardsWithTags(): Promise<BoardWithTags[]> {
   // 현재 사용자 인증 확인
-  const session = await getSession();
-  if (!session?.user) {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
     throw new Error("User not authenticated");
   }
 
@@ -234,7 +324,7 @@ export async function readBoardsWithTags(): Promise<BoardWithTags[]> {
       user_id: board.user_id,
       description: board.description,
       date: board.date,
-      time: board.time,
+      has_image: board.has_image || false, // Handle null/undefined as false
       tags: tags,
     };
   });
@@ -273,8 +363,12 @@ export async function readBoardById(
   boardId: string
 ): Promise<BoardWithTags | null> {
   // 현재 사용자 인증 확인
-  const session = await getSession();
-  if (!session?.user) {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
     throw new Error("User not authenticated");
   }
 
@@ -317,7 +411,7 @@ export async function readBoardById(
     user_id: data.user_id,
     description: data.description,
     date: data.date,
-    time: data.time,
+    has_image: data.has_image || false, // Handle null
     tags: tags,
   };
 
@@ -335,8 +429,12 @@ export async function readBoardById(
  */
 export async function getCurrentUserTags(): Promise<Tag[]> {
   // 현재 사용자 인증 확인
-  const session = await getSession();
-  if (!session?.user) {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
     throw new Error("User not authenticated");
   }
 
@@ -362,23 +460,22 @@ export async function updateBoard(
   updates: {
     description?: string;
     date?: string;
-    time?: string;
     tags?: Array<{ tag_name: string; tag_color: string }>;
     image?: File;
   }
 ) {
-  const session = await getSession();
-  if (!session?.user) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
     throw new Error("User not authenticated");
   }
-  const user = session.user;
 
   // board 업데이트 (현재 사용자의 board만 수정 가능)
   const boardUpdates: any = {};
   if (updates.description !== undefined)
     boardUpdates.description = updates.description;
   if (updates.date !== undefined) boardUpdates.date = updates.date;
-  if (updates.time !== undefined) boardUpdates.time = updates.time;
 
   if (Object.keys(boardUpdates).length > 0) {
     const { error: boardError } = await supabase
@@ -444,6 +541,12 @@ export async function updateBoard(
       postUuid: boardId,
       userId: user.id,
     });
+    
+    // Update has_image status flag
+    await supabase
+      .from("board")
+      .update({ has_image: true })
+      .eq("board_id", boardId);
   }
 }
 
@@ -453,8 +556,11 @@ export async function updateBoard(
  */
 export async function deleteBoard(boardId: string) {
   // 현재 사용자 인증 확인
-  const session = await getSession();
-  if (!session?.user) {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
     throw new Error("User not authenticated");
   }
 
@@ -484,5 +590,65 @@ export async function deleteBoard(boardId: string) {
 
   if (error) {
     throw new Error(`Failed to delete board: ${error.message}`);
+  }
+  
+  // Note: We don't decrement the counter because it tracks "boards created since compression"
+  // not "current board count". Deleting a board doesn't change how many were created.
+}
+
+/**
+ * user_analysis 테이블에서 압축된 기록 가져오기
+ */
+export async function getUserAnalysis(): Promise<{ 
+  compressed_data: string; 
+  boards_since_last_compression: number;
+} | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("user_analysis")
+    .select("compressed_data, boards_since_last_compression")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return {
+    compressed_data: data.compressed_data,
+    boards_since_last_compression: data.boards_since_last_compression ?? 0
+  };
+}
+
+/**
+ * Increment boards_since_last_compression counter
+ */
+export async function incrementBoardCounter(): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  // Use RPC to atomically increment
+  const { error } = await supabase.rpc('increment_board_counter', { 
+    p_user_id: user.id 
+  });
+  
+  if (error) {
+    console.error('Failed to increment board counter:', error);
+  }
+}
+
+/**
+ * Decrement boards_since_last_compression counter (min 0, wraps to 14 if at 0)
+ */
+export async function decrementBoardCounter(): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  // Use RPC to atomically decrement with wrap-around logic
+  const { error } = await supabase.rpc('decrement_board_counter', { 
+    p_user_id: user.id 
+  });
+  
+  if (error) {
+    console.error('Failed to decrement board counter:', error);
   }
 }

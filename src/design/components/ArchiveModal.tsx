@@ -47,6 +47,57 @@ export function ArchiveModal({
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
 
+  // Calendar data
+  const months = [
+    "JAN",
+    "FEB",
+    "MAR",
+    "APR",
+    "MAY",
+    "JUN",
+    "JUL",
+    "AUG",
+    "SEP",
+    "OCT",
+    "NOV",
+    "DEC",
+  ];
+
+  // 연도 배열: 1950년부터 현재 연도까지 (최신 연도부터 표시)
+  const currentYear = new Date().getFullYear();
+  const years = Array.from(
+    { length: currentYear - 1950 + 1 },
+    (_, i) => 1950 + i
+  ).reverse();
+
+  const daysOfWeek = ["월", "화", "수", "목", "금", "토", "일"];
+
+  // Calculate days in selected month
+  const getDaysInMonth = () => {
+    return new Date(selectedYear, selectedMonth + 1, 0).getDate();
+  };
+
+  // Calculate starting day of week (0 = Sunday, 1 = Monday, etc.)
+  const getStartPadding = () => {
+    const firstDay = new Date(selectedYear, selectedMonth, 1).getDay();
+    // Convert to Monday start (0 = Monday)
+    return firstDay === 0 ? 6 : firstDay - 1;
+  };
+
+  const daysInMonth = Array.from({ length: getDaysInMonth() }, (_, i) => i + 1);
+  const startPadding = getStartPadding();
+
+  // Calculate modal position
+  const getModalStyle = () => {
+    // Always center the modal
+    return {
+      position: "fixed" as const,
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+    };
+  };
+
   // 태그 불러오기
   useEffect(() => {
     const loadTags = async () => {
@@ -322,56 +373,7 @@ export function ArchiveModal({
     }
   };
 
-  // Calendar data
-  const months = [
-    "JAN",
-    "FEB",
-    "MAR",
-    "APR",
-    "MAY",
-    "JUN",
-    "JUL",
-    "AUG",
-    "SEP",
-    "OCT",
-    "NOV",
-    "DEC",
-  ];
 
-  // 연도 배열: 1950년부터 현재 연도까지 (최신 연도부터 표시)
-  const currentYear = new Date().getFullYear();
-  const years = Array.from(
-    { length: currentYear - 1950 + 1 },
-    (_, i) => 1950 + i
-  ).reverse();
-
-  const daysOfWeek = ["월", "화", "수", "목", "금", "토", "일"];
-
-  // Calculate days in selected month
-  const getDaysInMonth = () => {
-    return new Date(selectedYear, selectedMonth + 1, 0).getDate();
-  };
-
-  // Calculate starting day of week (0 = Sunday, 1 = Monday, etc.)
-  const getStartPadding = () => {
-    const firstDay = new Date(selectedYear, selectedMonth, 1).getDay();
-    // Convert to Monday start (0 = Monday)
-    return firstDay === 0 ? 6 : firstDay - 1;
-  };
-
-  const daysInMonth = Array.from({ length: getDaysInMonth() }, (_, i) => i + 1);
-  const startPadding = getStartPadding();
-
-  // Calculate modal position
-  const getModalStyle = () => {
-    // Always center the modal
-    return {
-      position: "fixed" as const,
-      top: "50%",
-      left: "50%",
-      transform: "translate(-50%, -50%)",
-    };
-  };
 
   return (
     <div

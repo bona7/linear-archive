@@ -10,6 +10,7 @@ import { NodeData, NodeTag } from "@/commons/types/types";
 import { signOut, getSession } from "@/commons/libs/supabase/auth";
 import {
   BoardWithTags,
+  Tag,
   readBoardsWithTags,
   getCurrentUserTags,
 } from "@/commons/libs/supabase/db";
@@ -20,6 +21,7 @@ import {
   LoadingIcon,
 } from "@/commons/libraries/loadingOverlay";
 import styled from "@emotion/styled";
+import { supabase } from "@/commons/libs/supabase/client";
 
 const FullScreenLoadingOverlay = styled(LoadingOverlay)`
   position: fixed !important;
@@ -47,6 +49,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [displayNameValue, setDisplayNameValue] = useState<string | null>(null);
   const [tags, setTags] = useState<NodeTag[]>([]);
+  const [rawTags, setRawTags] = useState<Tag[]>([]); // New state for raw tags
   const [selectedFilterTags, setSelectedFilterTags] = useState<NodeTag[]>([]);
   const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -88,7 +91,7 @@ export default function App() {
           ? { name: board.tags[0].tag_name, color: board.tags[0].tag_color }
           : undefined,
       date: board.date
-        ? new Date(`${board.date}T${board.time ?? "00:00:00"}`)
+        ? new Date(`${board.date}T${"00:00:00"}`)
         : undefined,
     };
   }
@@ -133,6 +136,11 @@ export default function App() {
 
   useEffect(() => {
     checkUser();
+    // Expose backfill tool to console
+    import("@/utils/backfill-has-image").then((mod) => {
+        (window as any).backfillHasImage = mod.backfillHasImage;
+        console.log("backfillHasImage helper loaded. Run window.backfillHasImage() to populate has_image column.");
+    });
   }, []);
 
   useEffect(() => {
@@ -155,8 +163,10 @@ export default function App() {
     const loadTags = async () => {
       if (!user) return;
       try {
-        const tags = await getCurrentUserTags();
-        const nodeTags: NodeTag[] = tags.map((tag) => ({
+        const tagsData = await getCurrentUserTags();
+        setRawTags(tagsData);
+        // Tag 타입을 NodeTag 타입으로 변환
+        const nodeTags: NodeTag[] = tagsData.map((tag) => ({
           name: tag.tag_name,
           color: tag.tag_color,
         }));
@@ -164,6 +174,7 @@ export default function App() {
       } catch (error) {
         console.error("Failed to load tags:", error);
         setTags([]);
+        setRawTags([]);
       }
     };
     loadTags();
@@ -378,6 +389,7 @@ export default function App() {
           isOpen={isAnalysisPanelOpen}
           onToggle={handleToggleAnalysisPanel}
           boards={boards}
+          tags={rawTags}
         />
       )}
 

@@ -16,7 +16,7 @@ import {
   Error,
 } from "./testCrud.style";
 import LLMSearchBar from "../llmSearchBar/llmSearchBar.index";
-import { fetchAnalysis } from "../AnalysisCall/AnalysisCall.index";
+import { fetchAnalysis } from "../../../../commons/statistics/AnalysisCall";
 
 export default function TestCrud() {
   const [description, setDescription] = useState("");
