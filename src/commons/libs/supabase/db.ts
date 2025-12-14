@@ -10,6 +10,7 @@ export interface Board {
   description: string | null;
   date: string | null;
   has_image: boolean; // Added
+  created_at?: string; // Timestamp when board was created
 }
 
 export interface Tag {
@@ -297,6 +298,7 @@ export async function readBoardsWithTags(): Promise<BoardWithTags[]> {
     .select(
       `
       *,
+      created_at,
       board_tag_jointable (
         tag_id,
         tags (
@@ -326,6 +328,7 @@ export async function readBoardsWithTags(): Promise<BoardWithTags[]> {
       date: board.date,
       has_image: board.has_image || false, // Handle null/undefined as false
       tags: tags,
+      created_at: board.created_at, // Include created_at
     };
   });
 
@@ -413,6 +416,7 @@ export async function readBoardById(
     date: data.date,
     has_image: data.has_image || false, // Handle null
     tags: tags,
+    created_at: data.created_at, // Include created_at
   };
 
   const imageUrl = await getPostImageUrl(boardId, data.user_id);
@@ -548,6 +552,14 @@ export async function updateBoard(
       .update({ has_image: true })
       .eq("board_id", boardId);
   }
+  
+  // Return the updated board properly formatted
+  const updatedBoardData = await readBoardById(boardId);
+  if (!updatedBoardData) {
+      throw new Error("Failed to retrieve updated board");
+  }
+  
+  return updatedBoardData;
 }
 
 /**

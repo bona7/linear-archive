@@ -5,6 +5,7 @@ import { ViewArchiveModal } from "@/design/components/ViewArchiveModal";
 import { SearchBar } from "@/design/components/SearchBar";
 import { LoginModal } from "@/design/components/LoginModal";
 import { ProfileMenu } from "@/design/components/ProfileMenu";
+import { QuickInsight } from "@/design/components/QuickInsight";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { NodeData, NodeTag } from "@/commons/types/types";
 import {
@@ -25,6 +26,8 @@ import {
 } from "@/commons/libraries/loadingOverlay";
 import styled from "@emotion/styled";
 import { supabase } from "@/commons/libs/supabase/client";
+import { calculateStatistics } from "@/commons/statistics/calculate";
+import { fetchQuickInsight } from "@/commons/statistics/AnalysisCall";
 
 const FullScreenLoadingOverlay = styled(LoadingOverlay)`
   position: fixed !important;
@@ -60,6 +63,7 @@ export default function App() {
     "email" | "check_email" | "success" | null
   >(null);
   const [isSignUpMode, setIsSignUpMode] = useState(false);
+  const [quickInsight, setQuickInsight] = useState<string | null>(null);
   const { minYear, maxYear } = useMemo(() => {
     const currentYear = new Date().getFullYear();
     
@@ -184,6 +188,25 @@ export default function App() {
     setIsSignUpMode(false); // 로그인된 상태에서는 회원가입 모드 해제
   }, [user]);
 
+  // Function to refresh quick insight
+  const refreshQuickInsight = async () => {
+    if (!user || boards.length === 0) {
+      setQuickInsight(null);
+      return;
+    }
+
+    try {
+      const statistics = calculateStatistics(boards, rawTags);
+      const insight = await fetchQuickInsight(boards, statistics);
+      setQuickInsight(insight);
+    } catch (error) {
+      console.error("Failed to load quick insight:", error);
+    }
+  };
+
+  // Quick insight should NOT auto-refresh on page load
+  // It should only be triggered by user actions (create/edit/delete)
+
   const handleLogin = () => {
     checkUser();
     setIsSignUpMode(false);
@@ -233,10 +256,15 @@ export default function App() {
     setIsEditModalOpen(true);
   };
 
-  const handleSaveArchive = async (date: Date | null) => {
+  const handleSaveArchive = async (date: Date | null, savedBoard?: any) => {
     if (user) {
       try {
+        // Determine if this is a create or update
+        const isUpdate = selectedNodeId !== null;
+        const targetBoardId = selectedNodeId;
+
         const updatedBoards = await readBoardsWithTags();
+
         const updatedTags = await getCurrentUserTags();
         const newNodeTags: NodeTag[] = updatedTags.map((tag) => ({
           name: tag.tag_name,
@@ -244,6 +272,36 @@ export default function App() {
         }));
         setTags(newNodeTags);
         setBoards(updatedBoards);
+
+        // Trigger quick insight after saving a board
+        const statistics = calculateStatistics(updatedBoards, updatedTags);
+        const action = isUpdate ? "update" : "create";
+
+        // Use the explicitly passed board object from ArchiveModal
+        let boardToAnalyze = savedBoard;
+
+        // Fallback logic...
+        if (!boardToAnalyze) {
+             if (targetBoardId) {
+                 boardToAnalyze = updatedBoards.find(b => b.board_id === targetBoardId);
+             } else if (updatedBoards.length > 0) {
+                 const sortedByCreatedAt = [...updatedBoards].sort((a, b) => {
+                    const aTime = new Date(a.created_at || 0).getTime();
+                    const bTime = new Date(b.created_at || 0).getTime();
+                    return bTime - aTime;
+                  });
+                 boardToAnalyze = sortedByCreatedAt[0];
+             }
+        }
+
+        const insight = await fetchQuickInsight(
+            updatedBoards,
+            statistics,
+            action,
+            boardToAnalyze?.board_id,
+            boardToAnalyze
+        );
+        setQuickInsight(insight);
       } catch (error) {
         console.error("Failed to reload boards:", error);
       }
@@ -261,6 +319,8 @@ export default function App() {
       try {
         const updatedBoards = await readBoardsWithTags();
         setBoards(updatedBoards);
+
+        // Quick Insight is NOT triggered on delete - only on create/update
       } catch (error) {
         console.error("Failed to reload boards:", error);
       }
@@ -523,7 +583,7 @@ export default function App() {
         </div>
 
         {/* Timeline Section */}
-        <div className="flex-1 flex items-center justify-center w-full">
+        <div className="flex-1 flex flex-col items-center justify-center w-full">
           <Timeline
             onNodeClick={handleNodeClick}
             selectedNodeId={selectedNodeId}
@@ -532,6 +592,9 @@ export default function App() {
             matchedNodeIds={matchedNodeIds}
             ref={timelineRef}
           />
+
+          {/* Quick Insight - Below Timeline */}
+          {user && <QuickInsight insight={quickInsight} />}
         </div>
       </div>
 
