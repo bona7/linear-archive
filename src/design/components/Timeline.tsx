@@ -743,6 +743,7 @@ export const Timeline = forwardRef<
               return (
                 <div
                   key={node.id}
+                  data-node-id={node.id}
                   className="absolute cursor-pointer z-10"
                   style={{
                     left: `${displayPosition}%`,
@@ -793,8 +794,21 @@ export const Timeline = forwardRef<
             if (!node || !nodeData || !timelineRef.current) return null;
 
             const nodeTag = nodeData.tags[0];
-            const nodeDate = new Date(nodeData.date);
 
+            // 날짜/시간은 문자열 기반으로 처리하여 타임존 보정에 영향을 받지 않도록 함
+            const rawDate = nodeData.date as string | null;
+            const rawTime = (nodeData as any).time as string | null;
+
+            let formattedDate = rawDate || "";
+            if (rawDate) {
+              const parts = rawDate.split("-");
+              if (parts.length === 3) {
+                const [y, m, d] = parts;
+                formattedDate = `${y}/${m}/${d}`;
+              }
+            }
+
+            const container = timelineRef.current;
             const clusterInfo = getNodeClusterInfo(node.id);
             const offset = clusterInfo
               ? getNodeOffset(
@@ -804,25 +818,27 @@ export const Timeline = forwardRef<
                 )
               : { x: 0, y: 0 };
 
-            const displayPosition = clusterInfo
-              ? clusterInfo.cluster.centerPosition
-              : node.position;
+            // 실제 DOM 상의 노드 중심 좌표를 사용하여 선/툴팁 위치 계산
+            const nodeElement = container.querySelector(
+              `[data-node-id="${node.id}"]`
+            ) as HTMLDivElement | null;
 
-            // 실시간 좌표 계산
-            const container = timelineRef.current;
-            const rect = container.getBoundingClientRect();
-            const scrollLeft = container.scrollLeft;
-            const totalContentWidth = rect.width * 4 * zoom;
+            if (!nodeElement) return null;
 
-            const currentX =
-              rect.left +
-              totalContentWidth * (displayPosition / 100) -
-              scrollLeft +
-              offset.x;
-            const currentY = rect.top + rect.height / 2 + offset.y;
+            const nodeRect = nodeElement.getBoundingClientRect();
+            const currentX = nodeRect.left + nodeRect.width / 2;
+            const currentY = nodeRect.top + nodeRect.height / 2;
 
-            const nodeRadius = 18;
+            const nodeRadius = nodeRect.height / 2;
             const lineStartY = currentY + nodeRadius;
+
+            // 디버깅용: 연결선 기준 좌표 확인
+            console.debug("[Timeline] tooltip anchor", {
+              nodeId: node.id,
+              nodeRect,
+              currentX,
+              currentY,
+            });
 
             return (
               <>
@@ -833,7 +849,7 @@ export const Timeline = forwardRef<
                     top: `${lineStartY}px`,
                     bottom: "80px",
                     width: "2px",
-                    zIndex: 999, // 정보창(1000)
+                    zIndex: 5, // 노드(z-10)보다 뒤에 위치하도록 조정
                   }}
                 />
                 <div
@@ -849,7 +865,7 @@ export const Timeline = forwardRef<
                     maxWidth: "250px",
                   }}
                 >
-                  {nodeData.date && (
+                  {rawDate && (
                     <div className="mb-1">
                       <span
                         style={{
@@ -857,17 +873,10 @@ export const Timeline = forwardRef<
                           fontFamily: "'JetBrains Mono', monospace",
                         }}
                       >
-                        {nodeDate.getFullYear()}/
-                        {String(nodeDate.getMonth() + 1).padStart(2, "0")}/
-                        {String(nodeDate.getDate()).padStart(2, "0")}
+                        {formattedDate}
                       </span>
-                      {(nodeDate.getHours() !== 0 ||
-                        nodeDate.getMinutes() !== 0) && (
-                        <span>
-                          {" "}
-                          {String(nodeDate.getHours()).padStart(2, "0")}:
-                          {String(nodeDate.getMinutes()).padStart(2, "0")}
-                        </span>
+                      {rawTime && rawTime !== "00:00:00" && (
+                        <span> {rawTime.slice(0, 5)}</span>
                       )}
                     </div>
                   )}

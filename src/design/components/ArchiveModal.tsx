@@ -250,6 +250,13 @@ export function ArchiveModal({
         selectedMinute
       ).padStart(2, "0")}:00`;
 
+      // 디버깅용: 프론트에서 어떤 시간 문자열을 만드는지 확인
+      console.log("[ArchiveModal] Debug time payload", {
+        selectedHour,
+        selectedMinute,
+        timeString,
+      });
+
       // 태그 배열을 createBoard 형식으로 변환
       const tags = selectedTags.map((tag) => ({
         tag_name: tag.name,
