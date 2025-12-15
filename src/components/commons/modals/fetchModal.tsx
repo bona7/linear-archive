@@ -30,7 +30,7 @@ const FetchModal: React.FC<FetchModalProps> = ({ onClose, post }) => {
       try {
         setIsLoading(true);
         // `readBoardById` - 이미지가 없는 경우에도 에러 없이 image_url 필드를 null로 반환
-        const boardData = await readBoardById(post.board_id, true);
+        const boardData = await readBoardById(post.board_id);
 
         console.log("[DEBUG] Fetched board data:", boardData);
 
