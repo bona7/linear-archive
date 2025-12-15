@@ -209,40 +209,43 @@ export const Timeline = forwardRef<
     const visibleRange = getVisibleRange();
 
     // 줌 정도에 따라 "기간 버킷" 개수(= 동심원 중심 개수)를
-    // 기계적으로, 매우 촘촘하게 변화시키는 함수
+    // 기계적으로, 단계적으로 변화시키는 함수
     const getPeriodBucketCount = (zoomLevel: number) => {
-      // 최대 축소 구간: 무조건 버킷 1개로 통합
-      const MAX_ZOOM_OUT_THRESHOLD = 0.3;
-      if (zoomLevel <= 0 || zoomLevel < MAX_ZOOM_OUT_THRESHOLD) {
-        return 1;
-      }
-
       const BUCKET_DISABLE_THRESHOLD = 3.0; // 이 이상이면 버킷 해제 (clusterNodes에서 처리)
-      const BUCKET_REENABLE_ZONE = 2.5; // 버킷이 다시 시작되는 구간 시작점
-      const MIN_BUCKETS_IN_REENABLE = 70; // 이 구간에서 최소 버킷 개수
+      const HIGH_DENSE_START = 2.7; // 가장 촘촘한 구간 시작
+      const MID_DENSE_START = 2.3; // 그 직전 구간 시작
 
-      // 버킷이 다시 시작되는 구간(2.5 ~ 3.0)에서는 최소 70개 이상의 버킷 보장
+      const MIN_BUCKETS_HIGH = 80; // 최상위 구간: 최소 70개 버킷
+      const MIN_BUCKETS_MID = 30; // 중간 구간: 최소 30개 버킷
+
+      // 1) 가장 촘촘한 구간: 2.7 ~ 3.0
       if (
-        zoomLevel >= BUCKET_REENABLE_ZONE &&
+        zoomLevel >= HIGH_DENSE_START &&
         zoomLevel < BUCKET_DISABLE_THRESHOLD
       ) {
         const clampedZoom = Math.min(zoomLevel, 5);
         const base =
           1 + 6 * Math.log2(1 + clampedZoom) + 2 * Math.sqrt(clampedZoom);
 
-        return Math.max(
-          MIN_BUCKETS_IN_REENABLE,
-          Math.min(80, Math.round(base)) // 상한선을 80 정도로 설정
-        );
+        return Math.max(MIN_BUCKETS_HIGH, Math.min(80, Math.round(base)));
       }
 
-      // 그 밖의 구간: 기존의 기계적 증가 로직
+      // 2) 중간 촘촘 구간: 2.3 ~ 2.7
+      if (zoomLevel >= MID_DENSE_START && zoomLevel < HIGH_DENSE_START) {
+        const clampedZoom = Math.min(zoomLevel, 5);
+        const base =
+          1 + 6 * Math.log2(1 + clampedZoom) + 2 * Math.sqrt(clampedZoom);
+
+        return Math.max(MIN_BUCKETS_MID, Math.min(60, Math.round(base)));
+      }
+
+      // 3) 그 밖의 구간: 기본 기계적 증가 로직
       const clampedZoom = Math.min(zoomLevel, 5); // 0 ~ 5 구간으로 클램프
       const base =
         1 + 6 * Math.log2(1 + clampedZoom) + 2 * Math.sqrt(clampedZoom);
 
-      // 최소 1, 최대 80 버킷 사이로 제한
-      const bucketCount = Math.max(1, Math.min(80, Math.round(base)));
+      // 최소 1, 최대 40 버킷 사이로 제한
+      const bucketCount = Math.max(1, Math.min(40, Math.round(base)));
 
       return bucketCount;
     };
@@ -252,17 +255,53 @@ export const Timeline = forwardRef<
     const clusterNodes = (nodes: typeof allNodes) => {
       if (nodes.length === 0) return [];
 
-      // ✅ 충분히 확대되었을 때는 버킷을 끄고
-      // 각 노드를 자기 날짜(position) 위치에 1:1 클러스터로 배치
-      // → 개별 노드가 자기 위치로 "돌아가는 단계"
+      // ✅ 충분히 확대되었을 때(zoom ≥ 3.0)는
+      // 같은 날짜(YYYY-MM-DD)끼리 묶어서 동심원 클러스터를 만든다
       if (zoom >= 3.0) {
-        return nodes.map((node, idx) => ({
-          id: idx,
-          centerPosition: node.position,
-          nodes: [node],
-        }));
+        const clusters: Array<{
+          id: number;
+          centerPosition: number;
+          nodes: typeof allNodes;
+        }> = [];
+
+        const groups = new Map<string, typeof allNodes>();
+
+        // 날짜 키 기준으로 그룹화
+        nodes.forEach((node) => {
+          const nodeData = nodesById.get(node.id);
+          if (!nodeData || !nodeData.date) return;
+
+          const dateObj = new Date(nodeData.date);
+          const year = dateObj.getFullYear();
+          const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+          const day = String(dateObj.getDate()).padStart(2, "0");
+          const dateKey = `${year}-${month}-${day}`;
+
+          const arr = groups.get(dateKey);
+          if (arr) arr.push(node);
+          else groups.set(dateKey, [node]);
+        });
+
+        let clusterId = 0;
+        groups.forEach((groupNodes) => {
+          if (groupNodes.length === 0) return;
+
+          // 이 날짜 그룹의 중심 position (타임라인 상 x 위치)
+          const centerPos =
+            groupNodes.reduce((sum, n) => sum + n.position, 0) /
+            groupNodes.length;
+
+          clusters.push({
+            id: clusterId++,
+            centerPosition: centerPos,
+            nodes: groupNodes, // 같은 날짜 노드들이 한 클러스터 안에 모임
+          });
+        });
+
+        return clusters;
       }
 
+      // ⬇️ zoom < 3.0 에서는 기존 버킷(기간) 기반 클러스터링 유지
       const bucketCount = getPeriodBucketCount(zoom);
       const bucketWidth = 100 / bucketCount;
 
@@ -319,52 +358,106 @@ export const Timeline = forwardRef<
     ) => {
       if (clusterSize === 1) return { x: 0, y: 0 };
 
-      // 동심원 방식: 반지름이 커질수록 더 많은 노드를 배치
+      // 동심원 방식: 반지름이 커질수록 그 링이 수용할 수 있는 노드 개수(capacity)가 늘어나고,
+      // 바깥 링이 너무 비어 보이지 않도록 링 개수와 배치를 동적으로 조정한다.
       const nodeSize = 24; // 노드 직경(px)
       const minSpacing = 8; // 노드 간 최소 간격(px)
       const spacingPerNode = nodeSize + minSpacing; // 노드 하나가 차지하는 둘레 길이
 
-      let currentIndex = 0;
-      let circleIndex = 0;
-      let indexInCircle = 0;
+      const baseRadius = isHovered ? 20 : 15; // 첫 번째 링 반지름
+      const radiusStep = 25; // 링이 하나 늘어날 때마다 반지름 증가
+      const MAX_RINGS = 8; // 한 클러스터에서 사용할 수 있는 최대 링 개수
+      const MIN_FILL_RATIO = 0.4; // 마지막 링이 이 비율보다 적게 채워지면 링 개수를 줄여서 재배치
 
-      // 이 노드가 속할 "몇 번째 원인지"와 "그 원 안의 인덱스"를 찾는 루프
-      while (currentIndex + 1 <= index) {
-        const baseRadius = isHovered ? 20 : 15; // 첫 번째 원 반지름
-        const radiusStep = 25; // 원이 하나 늘어날 때마다 반지름 증가
-        const currentRadius = baseRadius + circleIndex * radiusStep;
-
-        // 현재 원 둘레 기반으로 배치 가능한 최대 노드 수
-        const circumference = 2 * Math.PI * currentRadius;
-        const maxNodesInCircle = Math.max(
+      // 1) 각 링의 반지름과 수용 가능 노드 수(capacity) 계산
+      const radii: number[] = [];
+      const capacities: number[] = [];
+      for (let ring = 0; ring < MAX_RINGS; ring++) {
+        const radius = baseRadius + ring * radiusStep;
+        const circumference = 2 * Math.PI * radius;
+        const capacity = Math.max(
           3, // 최소 3개는 보장
           Math.floor(circumference / spacingPerNode)
         );
-
-        // 이 원 안에 index번째 노드가 들어갈 수 있으면 여기서 멈추기
-        if (currentIndex + maxNodesInCircle > index) {
-          indexInCircle = index - currentIndex;
-          break;
-        }
-
-        // 아니면 다음 원으로 이동
-        currentIndex += maxNodesInCircle;
-        circleIndex += 1;
+        radii.push(radius);
+        capacities.push(capacity);
       }
 
-      // 최종 반지름/각도 계산
-      const baseRadius = isHovered ? 20 : 15;
-      const radiusStep = 25;
-      const radius = baseRadius + circleIndex * radiusStep;
+      // 2) 최소한 clusterSize를 커버할 수 있는 가장 작은 링 개수 선택
+      let ringCount = 1;
+      for (let r = 1; r <= MAX_RINGS; r++) {
+        const totalCap = capacities.slice(0, r).reduce((sum, c) => sum + c, 0);
+        if (totalCap >= clusterSize) {
+          ringCount = r;
+          break;
+        }
+      }
 
-      const circumference = 2 * Math.PI * radius;
-      const maxNodesInCircle = Math.max(
-        3,
-        Math.floor(circumference / spacingPerNode)
-      );
+      // 3) 주어진 ringCount에서 각 링에 실제로 몇 개의 노드를 배치할지 계산
+      const computeLayout = (rings: number) => {
+        const nodesPerRing: number[] = new Array(rings).fill(0);
+        let remaining = clusterSize;
 
-      const angle =
-        (indexInCircle / maxNodesInCircle) * Math.PI * 2 - Math.PI / 2;
+        for (let i = 0; i < rings; i++) {
+          const take = Math.min(capacities[i], remaining);
+          nodesPerRing[i] = take;
+          remaining -= take;
+        }
+
+        // capacity를 다 써도 남는 노드가 있다면 마지막 링에 몰아넣기
+        if (remaining > 0) {
+          nodesPerRing[rings - 1] += remaining;
+        }
+
+        return nodesPerRing;
+      };
+
+      let nodesPerRing = computeLayout(ringCount);
+
+      // 4) 마지막 링이 너무 비어 있거나,
+      //    바깥 링의 노드 수가 바로 안쪽 링보다 많지 않으면
+      //    링 개수를 줄여서 재배치
+      while (ringCount > 1) {
+        const lastCapacity = capacities[ringCount - 1];
+        const lastNodes = nodesPerRing[ringCount - 1];
+        const prevNodes = nodesPerRing[ringCount - 2];
+        const fillRatio = lastNodes / lastCapacity;
+        const outerMoreThanInner = lastNodes > prevNodes;
+
+        if (fillRatio >= MIN_FILL_RATIO && outerMoreThanInner) break;
+
+        ringCount -= 1;
+        nodesPerRing = computeLayout(ringCount);
+      }
+
+      // 5) 각 링의 시작 인덱스(prefix sum) 계산
+      const ringStartIndex: number[] = new Array(ringCount).fill(0);
+      {
+        let acc = 0;
+        for (let i = 0; i < ringCount; i++) {
+          ringStartIndex[i] = acc;
+          acc += nodesPerRing[i];
+        }
+      }
+
+      // 6) 주어진 index가 어느 링에 속하는지, 그 링 안에서 몇 번째인지 계산
+      let ringIndex = ringCount - 1;
+      let indexInRing = 0;
+      for (let i = 0; i < ringCount; i++) {
+        const start = ringStartIndex[i];
+        const end = start + nodesPerRing[i];
+        if (index >= start && index < end) {
+          ringIndex = i;
+          indexInRing = index - start;
+          break;
+        }
+      }
+
+      const radius = radii[ringIndex];
+      const nodesInThisRing = Math.max(1, nodesPerRing[ringIndex]);
+
+      // 링 안에서는 항상 균등 분포로 배치 → 원형이 유지됨
+      const angle = (indexInRing / nodesInThisRing) * Math.PI * 2 - Math.PI / 2;
 
       return {
         x: Math.cos(angle) * radius,
