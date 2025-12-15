@@ -164,6 +164,27 @@ function MyApp({ Component, pageProps }) {
     return () => router.events.off("routeChangeComplete", trackPageView);
   }, [router.events, router.asPath, router.pathname]);
 
+  // ✅ 매크로 함수들을 window 객체에 등록
+  useEffect(() => {
+    // Bulk node creation macro
+    import("@/utils/createBulkNodes").then((mod) => {
+      (window as any).createBulkNodes = mod.createBulkNodes;
+      console.log(
+        "createBulkNodes macro loaded. Usage: window.createBulkNodes(count, date?, delayMs?)"
+      );
+      console.log("Example: window.createBulkNodes(200, '2025-01-15', 100)");
+    });
+
+    // Sequential node creation macro (하루에 하나씩 증가)
+    import("@/utils/createSequentialNodes").then((mod) => {
+      (window as any).createSequentialNodes = mod.createSequentialNodes;
+      console.log(
+        "createSequentialNodes loaded. Usage: window.createSequentialNodes(startDate?, days?, delayMs?)"
+      );
+      console.log("Example: window.createSequentialNodes('2025-01-01', 100, 100)");
+    });
+  }, []);
+
   return (
     <>
       <Head>

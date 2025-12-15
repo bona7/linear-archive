@@ -12,7 +12,16 @@ export default function Layout(props: ILayoutProps): JSX.Element {
 
   return (
     <>
-      <div style={{ backgroundColor: "white" }}>{props.children}</div>
+      <div
+        style={{
+          backgroundColor: "white",
+          height: "calc(var(--vh, 1vh) * 100)",
+          overflow: "hidden",
+          width: "100%",
+        }}
+      >
+        {props.children}
+      </div>
     </>
   );
 }

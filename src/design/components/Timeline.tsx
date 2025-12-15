@@ -135,24 +135,25 @@ export const Timeline = forwardRef<
           const rect = timeline.getBoundingClientRect();
           const mouseX = e.clientX - rect.left; // 컨테이너 내 마우스 X 좌표
           const currentScrollLeft = timeline.scrollLeft;
-          
+
           // 2. 줌 변경량 계산
           const delta = -e.deltaY * 0.001;
-          
+
           setZoom((prevZoom) => {
             const newZoom = Math.max(0.25, Math.min(maxZoom, prevZoom + delta));
-            
+
             // 3. 줌 비율 (몇 배 커졌/작아졌는지)
             const zoomFactor = newZoom / prevZoom;
 
             // 4. 새로운 스크롤 위치 계산 (핵심 공식)
             // (현재 보고 있는 지점) * 비율 - (마우스 위치 보정)
             // 논리: 마우스가 가리키는 실제 데이터 지점은 변하지 않아야 함
-            const newScrollLeft = (currentScrollLeft + mouseX) * zoomFactor - mouseX;
+            const newScrollLeft =
+              (currentScrollLeft + mouseX) * zoomFactor - mouseX;
 
             // 5. 즉시 적용 (requestAnimationFrame 제거 - 동기화 문제 방지)
             if (timeline) {
-                timeline.scrollLeft = newScrollLeft;
+              timeline.scrollLeft = newScrollLeft;
             }
 
             return newZoom;
@@ -207,50 +208,105 @@ export const Timeline = forwardRef<
 
     const visibleRange = getVisibleRange();
 
+    // 줌 정도에 따라 "기간 버킷" 개수(= 동심원 중심 개수)를
+    // 기계적으로, 매우 촘촘하게 변화시키는 함수
+    const getPeriodBucketCount = (zoomLevel: number) => {
+      // 최대 축소 구간: 무조건 버킷 1개로 통합
+      const MAX_ZOOM_OUT_THRESHOLD = 0.3;
+      if (zoomLevel <= 0 || zoomLevel < MAX_ZOOM_OUT_THRESHOLD) {
+        return 1;
+      }
+
+      const BUCKET_DISABLE_THRESHOLD = 3.0; // 이 이상이면 버킷 해제 (clusterNodes에서 처리)
+      const BUCKET_REENABLE_ZONE = 2.5; // 버킷이 다시 시작되는 구간 시작점
+      const MIN_BUCKETS_IN_REENABLE = 70; // 이 구간에서 최소 버킷 개수
+
+      // 버킷이 다시 시작되는 구간(2.5 ~ 3.0)에서는 최소 70개 이상의 버킷 보장
+      if (
+        zoomLevel >= BUCKET_REENABLE_ZONE &&
+        zoomLevel < BUCKET_DISABLE_THRESHOLD
+      ) {
+        const clampedZoom = Math.min(zoomLevel, 5);
+        const base =
+          1 + 6 * Math.log2(1 + clampedZoom) + 2 * Math.sqrt(clampedZoom);
+
+        return Math.max(
+          MIN_BUCKETS_IN_REENABLE,
+          Math.min(80, Math.round(base)) // 상한선을 80 정도로 설정
+        );
+      }
+
+      // 그 밖의 구간: 기존의 기계적 증가 로직
+      const clampedZoom = Math.min(zoomLevel, 5); // 0 ~ 5 구간으로 클램프
+      const base =
+        1 + 6 * Math.log2(1 + clampedZoom) + 2 * Math.sqrt(clampedZoom);
+
+      // 최소 1, 최대 80 버킷 사이로 제한
+      const bucketCount = Math.max(1, Math.min(80, Math.round(base)));
+
+      return bucketCount;
+    };
+
+    // 기간(포지션 구간) 기준으로 노드를 묶어서
+    // 각 기간이 동심원 하나의 중심이 되도록 만드는 함수
     const clusterNodes = (nodes: typeof allNodes) => {
-      const sorted = [...nodes].sort((a, b) => a.position - b.position);
+      if (nodes.length === 0) return [];
+
+      // ✅ 충분히 확대되었을 때는 버킷을 끄고
+      // 각 노드를 자기 날짜(position) 위치에 1:1 클러스터로 배치
+      // → 개별 노드가 자기 위치로 "돌아가는 단계"
+      if (zoom >= 3.0) {
+        return nodes.map((node, idx) => ({
+          id: idx,
+          centerPosition: node.position,
+          nodes: [node],
+        }));
+      }
+
+      const bucketCount = getPeriodBucketCount(zoom);
+      const bucketWidth = 100 / bucketCount;
+
+      const buckets: Array<{
+        id: number;
+        centerPosition: number;
+        nodes: typeof allNodes;
+      }> = [];
+
+      for (let i = 0; i < bucketCount; i++) {
+        buckets.push({
+          id: i,
+          centerPosition: 0,
+          nodes: [],
+        });
+      }
+
+      // 각 노드를 0~100% 구간 기준으로 버킷에 할당
+      nodes.forEach((node) => {
+        const rawIndex = Math.floor(node.position / bucketWidth);
+        const bucketIndex = Math.min(bucketCount - 1, Math.max(0, rawIndex));
+        buckets[bucketIndex].nodes.push(node);
+      });
+
       const clusters: Array<{
         id: number;
         centerPosition: number;
         nodes: typeof allNodes;
       }> = [];
 
-      const clusterThreshold = 0.6 / zoom;
-      let currentCluster: typeof allNodes = [];
-      let clusterId = 0;
+      buckets.forEach((bucket) => {
+        if (bucket.nodes.length === 0) return;
 
-      sorted.forEach((node, index) => {
-        if (currentCluster.length === 0) {
-          currentCluster.push(node);
-        } else {
-          const lastNode = currentCluster[currentCluster.length - 1];
-          const distance = Math.abs(node.position - lastNode.position);
+        const centerPos =
+          bucket.nodes.reduce((sum, n) => sum + n.position, 0) /
+          bucket.nodes.length;
 
-          if (distance <= clusterThreshold) {
-            currentCluster.push(node);
-          } else {
-            const centerPos =
-              currentCluster.reduce((sum, n) => sum + n.position, 0) /
-              currentCluster.length;
-            clusters.push({
-              id: clusterId++,
-              centerPosition: centerPos,
-              nodes: [...currentCluster],
-            });
-            currentCluster = [node];
-          }
-        }
-        if (index === sorted.length - 1 && currentCluster.length > 0) {
-          const centerPos =
-            currentCluster.reduce((sum, n) => sum + n.position, 0) /
-            currentCluster.length;
-          clusters.push({
-            id: clusterId++,
-            centerPosition: centerPos,
-            nodes: [...currentCluster],
-          });
-        }
+        clusters.push({
+          id: bucket.id,
+          centerPosition: centerPos,
+          nodes: bucket.nodes,
+        });
       });
+
       return clusters;
     };
 
@@ -262,9 +318,54 @@ export const Timeline = forwardRef<
       isHovered: boolean
     ) => {
       if (clusterSize === 1) return { x: 0, y: 0 };
-      const baseRadius = isHovered ? 30 : 20;
-      const radius = baseRadius + (clusterSize > 6 ? (clusterSize - 6) * 4 : 0);
-      const angle = (index / clusterSize) * Math.PI * 2 - Math.PI / 2;
+
+      // 동심원 방식: 반지름이 커질수록 더 많은 노드를 배치
+      const nodeSize = 24; // 노드 직경(px)
+      const minSpacing = 8; // 노드 간 최소 간격(px)
+      const spacingPerNode = nodeSize + minSpacing; // 노드 하나가 차지하는 둘레 길이
+
+      let currentIndex = 0;
+      let circleIndex = 0;
+      let indexInCircle = 0;
+
+      // 이 노드가 속할 "몇 번째 원인지"와 "그 원 안의 인덱스"를 찾는 루프
+      while (currentIndex + 1 <= index) {
+        const baseRadius = isHovered ? 20 : 15; // 첫 번째 원 반지름
+        const radiusStep = 25; // 원이 하나 늘어날 때마다 반지름 증가
+        const currentRadius = baseRadius + circleIndex * radiusStep;
+
+        // 현재 원 둘레 기반으로 배치 가능한 최대 노드 수
+        const circumference = 2 * Math.PI * currentRadius;
+        const maxNodesInCircle = Math.max(
+          3, // 최소 3개는 보장
+          Math.floor(circumference / spacingPerNode)
+        );
+
+        // 이 원 안에 index번째 노드가 들어갈 수 있으면 여기서 멈추기
+        if (currentIndex + maxNodesInCircle > index) {
+          indexInCircle = index - currentIndex;
+          break;
+        }
+
+        // 아니면 다음 원으로 이동
+        currentIndex += maxNodesInCircle;
+        circleIndex += 1;
+      }
+
+      // 최종 반지름/각도 계산
+      const baseRadius = isHovered ? 20 : 15;
+      const radiusStep = 25;
+      const radius = baseRadius + circleIndex * radiusStep;
+
+      const circumference = 2 * Math.PI * radius;
+      const maxNodesInCircle = Math.max(
+        3,
+        Math.floor(circumference / spacingPerNode)
+      );
+
+      const angle =
+        (indexInCircle / maxNodesInCircle) * Math.PI * 2 - Math.PI / 2;
+
       return {
         x: Math.cos(angle) * radius,
         y: Math.sin(angle) * radius,
@@ -423,7 +524,7 @@ export const Timeline = forwardRef<
         {/* Timeline Container */}
         <div
           ref={timelineRef}
-          className="relative w-full h-60 overflow-x-auto overflow-y-hidden timeline-container"
+          className="relative w-full h-60 overflow-x-auto overflow-y-hidden timeline-container px-8"
         >
           <div
             className="relative h-full"

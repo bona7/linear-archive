@@ -30,7 +30,7 @@ export function ArchiveModal({
   const [selectedYear, setSelectedYear] = useState<number>(2025);
   const [selectedMonth, setSelectedMonth] = useState<number>(10); // November (0-indexed)
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [selectedHour, setSelectedHour] = useState<number>(12);
+  const [selectedHour, setSelectedHour] = useState<number>(0);
   const [selectedMinute, setSelectedMinute] = useState<number>(0);
   // selectedTag를 selectedTags 배열로 변경
   const [selectedTags, setSelectedTags] = useState<NodeTag[]>([]);
@@ -136,7 +136,7 @@ export function ArchiveModal({
         setSelectedYear(2025);
         setSelectedMonth(10);
         setSelectedDay(null);
-        setSelectedHour(12);
+        setSelectedHour(0);
         setSelectedMinute(0);
         setSelectedImage(null);
         setSelectedImageFile(null);
@@ -181,7 +181,7 @@ export function ArchiveModal({
               setSelectedMinute(Number(timeParts[1]));
             }
           } else {
-            setSelectedHour(12);
+            setSelectedHour(0);
             setSelectedMinute(0);
           }
 
@@ -372,8 +372,6 @@ export function ArchiveModal({
       fileInputRef.current.value = "";
     }
   };
-
-
 
   return (
     <div
@@ -837,7 +835,9 @@ export function ArchiveModal({
                     >
                       <select
                         value={selectedHour}
-                        onChange={(e) => setSelectedHour(Number(e.target.value))}
+                        onChange={(e) =>
+                          setSelectedHour(Number(e.target.value))
+                        }
                         className="bg-white px-2 py-1 outline-none"
                         style={{
                           // [데이터/숫자 규칙] JetBrains Mono

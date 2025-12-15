@@ -90,9 +90,7 @@ export default function App() {
         board.tags.length > 0
           ? { name: board.tags[0].tag_name, color: board.tags[0].tag_color }
           : undefined,
-      date: board.date
-        ? new Date(`${board.date}T${"00:00:00"}`)
-        : undefined,
+      date: board.date ? new Date(`${board.date}T${"00:00:00"}`) : undefined,
     };
   }
 
@@ -138,8 +136,10 @@ export default function App() {
     checkUser();
     // Expose backfill tool to console
     import("@/utils/backfill-has-image").then((mod) => {
-        (window as any).backfillHasImage = mod.backfillHasImage;
-        console.log("backfillHasImage helper loaded. Run window.backfillHasImage() to populate has_image column.");
+      (window as any).backfillHasImage = mod.backfillHasImage;
+      console.log(
+        "backfillHasImage helper loaded. Run window.backfillHasImage() to populate has_image column."
+      );
     });
   }, []);
 
@@ -393,11 +393,14 @@ export default function App() {
         />
       )}
 
-      {/* [수정됨] Header 
-        - z-index: 50 (배경보다 무조건 위에 있어야 함)
-        - pointer-events-none: 클릭 통과 (하위 버튼들은 auto로 설정)
-      */}
-      <header className="fixed top-0 left-0 right-0 pt-8 pb-8 pointer-events-none z-50">
+      {/* [수정됨] Header - 반응형 패딩 */}
+      <header
+        className="fixed top-0 left-0 right-0 pointer-events-none z-50"
+        style={{
+          paddingTop: "clamp(1rem, 2vw, 2rem)",
+          paddingBottom: "clamp(1rem, 2vw, 2rem)",
+        }}
+      >
         {/* User Nickname */}
         {user && (
           <div
@@ -411,7 +414,7 @@ export default function App() {
               className="tracking-tight"
               style={{
                 fontFamily: "Georgia, 'Pretendard', sans-serif",
-                fontSize: "48px",
+                fontSize: "clamp(24px, 4vw, 48px)",
                 fontWeight: "bold",
                 lineHeight: "1",
               }}
@@ -421,12 +424,12 @@ export default function App() {
           </div>
         )}
 
-        {/* Linear Archive Title - 조건문 제거, 항상 렌더링 */}
+        {/* Linear Archive Title - 반응형 폰트 크기 */}
         <h1
           className="text-center tracking-tight transition-all duration-700 ease-out"
           style={{
             fontFamily: "Georgia, sans-serif",
-            fontSize: "96px",
+            fontSize: "clamp(48px, 8vw, 96px)",
             fontWeight: "bold",
             lineHeight: "1",
             transform: user ? "translateY(0)" : "translateY(40px)",
@@ -451,14 +454,13 @@ export default function App() {
         )}
       </header>
 
-      {/* [수정됨] Main Content Background
-        - z-index: 0 (가장 뒤로 보내서 헤더를 덮지 않게 함)
-      */}
+      {/* [수정됨] Main Content Background - 뷰포트 기반 높이 */}
       <div
-        className={`min-h-screen bg-[#F2F0EB] relative overflow-hidden flex flex-col transition-all duration-500 z-0 ${
+        className={`bg-[#F2F0EB] relative overflow-hidden flex flex-col transition-all duration-500 z-0 ${
           !user ? "blur-[2px]" : "blur-0"
         }`}
         style={{
+          height: "calc(var(--vh, 1vh) * 100)",
           backgroundImage: `
             radial-gradient(circle, rgba(0, 0, 0, 0.15) 1px, transparent 1px),
             url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' /%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23noise)' opacity='0.06'/%3E%3C/svg%3E")
@@ -466,10 +468,14 @@ export default function App() {
           backgroundSize: "24px 24px, 400px 400px",
         }}
       >
-        {/* Header Spacer - 헤더 높이만큼 공간 확보 */}
+        {/* Header Spacer - 반응형 높이 (뷰포트 비율 기반) */}
         <div
           className="transition-all duration-700 ease-out"
-          style={{ height: user ? "320px" : "280px" }}
+          style={{
+            height: user
+              ? "clamp(200px, 30vh, 320px)"
+              : "clamp(180px, 28vh, 280px)",
+          }}
         />
 
         {/* Search Bar */}
@@ -484,7 +490,10 @@ export default function App() {
         )}
 
         {/* Tags List */}
-        <div className="flex justify-center overflow-hidden p-8 space-x-8">
+        <div
+          className="flex justify-center overflow-hidden p-8 space-x-8"
+          style={{ marginTop: "3rem" }}
+        >
           {tags.map((tag, index) => {
             const isSelected = selectedFilterTags.some(
               (t) => t.name === tag.name && t.color === tag.color
@@ -522,7 +531,7 @@ export default function App() {
         </div>
 
         {/* Timeline Section */}
-        <div className="flex-1 flex items-center justify-center w-full">
+        <div className="flex-1 flex items-center justify-center w-full min-h-0">
           <Timeline
             onNodeClick={handleNodeClick}
             selectedNodeId={selectedNodeId}
