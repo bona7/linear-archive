@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import svgPaths from "src/design/imports/svg-jicd7esovz";
+import svgPaths from "@/imports/svg-jicd7esovz";
 import supabase_logo from "public/assets/supabase_logo.png";
 
-import { signIn, signUp } from "../../commons/libs/supabase/auth";
+import { signIn, signUp } from "../commons/libs/supabase/auth";
 
 interface LoginModalProps {
   isOpen: boolean;

@@ -7,7 +7,7 @@ import {
   createBoard,
   updateBoard,
   readBoardById,
-} from "../../commons/libs/supabase/db";
+} from "../commons/libs/supabase/db";
 import { NodeData, NodeTag } from "@/commons/types/types";
 
 interface ArchiveModalProps {
@@ -27,13 +27,10 @@ export function ArchiveModal({
   position,
   currentNodeData,
 }: ArchiveModalProps) {
-// ... (skip unchanged lines)
-
-
-  const [selectedYear, setSelectedYear] = useState<number>(2025);
-  const [selectedMonth, setSelectedMonth] = useState<number>(10); // November (0-indexed)
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [selectedHour, setSelectedHour] = useState<number>(12);
+  const [selectedHour, setSelectedHour] = useState<number>(0);
   const [selectedMinute, setSelectedMinute] = useState<number>(0);
   // selectedTag를 selectedTags 배열로 변경
   const [selectedTags, setSelectedTags] = useState<NodeTag[]>([]);
@@ -69,8 +66,8 @@ export function ArchiveModal({
   // 연도 배열: 1950년부터 현재 연도까지 (최신 연도부터 표시)
   const currentYear = new Date().getFullYear();
   const years = Array.from(
-    { length: currentYear - 1950 + 1 },
-    (_, i) => 1950 + i
+    { length: currentYear - 2015 + 1 },
+    (_, i) => 2015 + i
   ).reverse();
 
   const daysOfWeek = ["월", "화", "수", "목", "금", "토", "일"];
@@ -131,15 +128,16 @@ export function ArchiveModal({
     const loadBoardData = async () => {
       if (!isOpen) return;
 
-      // 수정 모드가 아니면 초기값 설정
+      // 수정 모드가 아니면 초기값 오늘로 설정
       if (!currentNodeData?.id) {
+        const today = new Date();
+        setSelectedYear(today.getFullYear());
+        setSelectedMonth(today.getMonth());
+        setSelectedDay(today.getDate());
         setSelectedTags([]);
         setDescription("");
         setErrorMessage(null);
-        setSelectedYear(2025);
-        setSelectedMonth(10);
-        setSelectedDay(null);
-        setSelectedHour(12);
+        setSelectedHour(0);
         setSelectedMinute(0);
         setSelectedImage(null);
         setSelectedImageFile(null);
@@ -184,7 +182,7 @@ export function ArchiveModal({
               setSelectedMinute(Number(timeParts[1]));
             }
           } else {
-            setSelectedHour(12);
+            setSelectedHour(0);
             setSelectedMinute(0);
           }
 
@@ -252,6 +250,13 @@ export function ArchiveModal({
       const timeString = `${String(selectedHour).padStart(2, "0")}:${String(
         selectedMinute
       ).padStart(2, "0")}:00`;
+
+      // 디버깅용: 프론트에서 어떤 시간 문자열을 만드는지 확인
+      console.log("[ArchiveModal] Debug time payload", {
+        selectedHour,
+        selectedMinute,
+        timeString,
+      });
 
       // 태그 배열을 createBoard 형식으로 변환
       const tags = selectedTags.map((tag) => ({
@@ -384,8 +389,6 @@ export function ArchiveModal({
       fileInputRef.current.value = "";
     }
   };
-
-
 
   return (
     <div
@@ -849,7 +852,9 @@ export function ArchiveModal({
                     >
                       <select
                         value={selectedHour}
-                        onChange={(e) => setSelectedHour(Number(e.target.value))}
+                        onChange={(e) =>
+                          setSelectedHour(Number(e.target.value))
+                        }
                         className="bg-white px-2 py-1 outline-none"
                         style={{
                           // [데이터/숫자 규칙] JetBrains Mono

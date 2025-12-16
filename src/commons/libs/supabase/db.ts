@@ -7,6 +7,7 @@ import { triggerDataCompression } from "../../statistics/AnalysisCall";
 export interface Board {
   board_id: string;
   user_id: string;
+  time: string | null;
   description: string | null;
   date: string | null;
   has_image: boolean; // Added
@@ -193,7 +194,10 @@ export async function createBoard(params: CreateBoardParams) {
         await embeddingPromise;
         console.log(`Embedding created for board ${boardId}`);
       } catch (embedErr: any) {
-        console.error(`Embedding FAILED for board ${boardId}:`, embedErr.message);
+        console.error(
+          `Embedding FAILED for board ${boardId}:`,
+          embedErr.message
+        );
         // Don't throw - board was created successfully, just embedding failed
       }
     } else {
@@ -202,55 +206,68 @@ export async function createBoard(params: CreateBoardParams) {
           console.log(`Embedding created for board ${boardId}`);
         })
         .catch((embedErr: any) => {
-          console.error(`Embedding FAILED for board ${boardId}:`, embedErr.message);
+          console.error(
+            `Embedding FAILED for board ${boardId}:`,
+            embedErr.message
+          );
           console.error("Full error:", embedErr);
         });
     }
 
     // 9. INCREMENT BOARD COUNTER AND CHECK FOR COMPRESSION TRIGGER
-    incrementBoardCounter().then(async () => {
-      // Check current counter value
-      const analysisData = await getUserAnalysis();
-      const counter = analysisData?.boards_since_last_compression ?? 0;
-      
-      console.log(`[Compression] Board counter: ${counter}`);
-      
-      if (counter >= 30) {
-        console.log(`[Compression] Counter reached ${counter}. Triggering compression for boards 16-30...`);
-        
-        // Fetch boards 16-30 (indices 15-29) to compress
-        // Keep the latest 15 boards (indices 0-14) uncompressed
-        const { data, error } = await supabase.from('board')
-          .select(`
+    incrementBoardCounter()
+      .then(async () => {
+        // Check current counter value
+        const analysisData = await getUserAnalysis();
+        const counter = analysisData?.boards_since_last_compression ?? 0;
+
+        console.log(`[Compression] Board counter: ${counter}`);
+
+        if (counter >= 30) {
+          console.log(
+            `[Compression] Counter reached ${counter}. Triggering compression for boards 16-30...`
+          );
+
+          // Fetch boards 16-30 (indices 15-29) to compress
+          // Keep the latest 15 boards (indices 0-14) uncompressed
+          const { data, error } = await supabase
+            .from("board")
+            .select(
+              `
             description, 
             date, 
             board_tag_jointable (tags (tag_name))
-          `)
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false }) // Use created_at for strict chronological order
-          .range(15, counter - 1); // Fetch from 16th (index 15) to current count (index counter-1)
-        
-        if (error) {
-          console.error("[Compression] Failed to fetch boards:", error);
-          return;
+          `
+            )
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false }) // Use created_at for strict chronological order
+            .range(15, counter - 1); // Fetch from 16th (index 15) to current count (index counter-1)
+
+          if (error) {
+            console.error("[Compression] Failed to fetch boards:", error);
+            return;
+          }
+
+          if (data && data.length > 0) {
+            console.log(`[Compression] Compressing ${data.length} boards...`);
+
+            // Clean up structure for AI
+            const cleanParams = data.map((b: any) => ({
+              description: b.description,
+              date: b.date,
+              tags:
+                b.board_tag_jointable
+                  ?.map((bt: any) => bt.tags?.tag_name)
+                  .filter(Boolean) || [],
+            }));
+
+            triggerDataCompression(cleanParams, userId);
+          }
         }
-        
-        if (data && data.length > 0) {
-          console.log(`[Compression] Compressing ${data.length} boards...`);
-          
-          // Clean up structure for AI
-          const cleanParams = data.map((b: any) => ({
-            description: b.description,
-            date: b.date,
-            tags: b.board_tag_jointable?.map((bt: any) => bt.tags?.tag_name).filter(Boolean) || []
-          }));
-          
-          triggerDataCompression(cleanParams, userId);
-        }
-      }
-    }).catch(err => {
-      console.error("[Compression] Counter increment failed:", err);
-    });
+      })
+      .catch((err) => {
+        console.error("[Compression] Counter increment failed:", err);
+      });
 
     return {
       ...boardData,
@@ -326,6 +343,7 @@ export async function readBoardsWithTags(): Promise<BoardWithTags[]> {
       user_id: board.user_id,
       description: board.description,
       date: board.date,
+      time: board.time,
       has_image: board.has_image || false, // Handle null/undefined as false
       tags: tags,
       created_at: board.created_at, // Include created_at
@@ -414,6 +432,7 @@ export async function readBoardById(
     user_id: data.user_id,
     description: data.description,
     date: data.date,
+    time: data.time,
     has_image: data.has_image || false, // Handle null
     tags: tags,
     created_at: data.created_at, // Include created_at
@@ -464,6 +483,7 @@ export async function updateBoard(
   updates: {
     description?: string;
     date?: string;
+    time?: string;
     tags?: Array<{ tag_name: string; tag_color: string }>;
     image?: File;
   }
@@ -545,7 +565,7 @@ export async function updateBoard(
       postUuid: boardId,
       userId: user.id,
     });
-    
+
     // Update has_image status flag
     await supabase
       .from("board")
@@ -603,7 +623,7 @@ export async function deleteBoard(boardId: string) {
   if (error) {
     throw new Error(`Failed to delete board: ${error.message}`);
   }
-  
+
   // Note: We don't decrement the counter because it tracks "boards created since compression"
   // not "current board count". Deleting a board doesn't change how many were created.
 }
@@ -611,11 +631,13 @@ export async function deleteBoard(boardId: string) {
 /**
  * user_analysis 테이블에서 압축된 기록 가져오기
  */
-export async function getUserAnalysis(): Promise<{ 
-  compressed_data: string; 
+export async function getUserAnalysis(): Promise<{
+  compressed_data: string;
   boards_since_last_compression: number;
 } | null> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return null;
 
   const { data, error } = await supabase
@@ -627,7 +649,7 @@ export async function getUserAnalysis(): Promise<{
   if (error || !data) return null;
   return {
     compressed_data: data.compressed_data,
-    boards_since_last_compression: data.boards_since_last_compression ?? 0
+    boards_since_last_compression: data.boards_since_last_compression ?? 0,
   };
 }
 
@@ -635,16 +657,18 @@ export async function getUserAnalysis(): Promise<{
  * Increment boards_since_last_compression counter
  */
 export async function incrementBoardCounter(): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return;
 
   // Use RPC to atomically increment
-  const { error } = await supabase.rpc('increment_board_counter', { 
-    p_user_id: user.id 
+  const { error } = await supabase.rpc("increment_board_counter", {
+    p_user_id: user.id,
   });
-  
+
   if (error) {
-    console.error('Failed to increment board counter:', error);
+    console.error("Failed to increment board counter:", error);
   }
 }
 
@@ -652,15 +676,17 @@ export async function incrementBoardCounter(): Promise<void> {
  * Decrement boards_since_last_compression counter (min 0, wraps to 14 if at 0)
  */
 export async function decrementBoardCounter(): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return;
 
   // Use RPC to atomically decrement with wrap-around logic
-  const { error } = await supabase.rpc('decrement_board_counter', { 
-    p_user_id: user.id 
+  const { error } = await supabase.rpc("decrement_board_counter", {
+    p_user_id: user.id,
   });
-  
+
   if (error) {
-    console.error('Failed to decrement board counter:', error);
+    console.error("Failed to decrement board counter:", error);
   }
 }

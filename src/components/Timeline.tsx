@@ -8,6 +8,7 @@ import {
   useMemo,
 } from "react";
 import { BoardWithTags } from "@/commons/libs/supabase/db";
+import { NodeTag } from "@/commons/types/types";
 
 interface TimelineProps {
   onNodeClick: (
@@ -18,6 +19,7 @@ interface TimelineProps {
   nodeDataMap: BoardWithTags[];
   searchQuery: string;
   matchedNodeIds: Set<number | string>;
+  selectedFilterTags?: NodeTag[];
 }
 
 export const Timeline = forwardRef<
@@ -25,7 +27,14 @@ export const Timeline = forwardRef<
   TimelineProps
 >(
   (
-    { onNodeClick, selectedNodeId, nodeDataMap, searchQuery, matchedNodeIds },
+    {
+      onNodeClick,
+      selectedNodeId,
+      nodeDataMap,
+      searchQuery,
+      matchedNodeIds,
+      selectedFilterTags,
+    },
     ref
   ) => {
     const [scrollPosition, setScrollPosition] = useState(0);
@@ -37,6 +46,34 @@ export const Timeline = forwardRef<
       null
     );
     const timelineRef = useRef<HTMLDivElement>(null);
+    const [nodeDisplayTags, setNodeDisplayTags] = useState<
+      Map<number | string, any>
+    >(new Map());
+    console.log("Timeline - 받아온 selectedFilterTags:", selectedFilterTags);
+
+    // useEffect로 검색어 변경 시 displayTag 계산
+    useEffect(() => {
+      if (!searchQuery.trim()) {
+        setNodeDisplayTags(new Map());
+        return;
+      }
+
+      const newDisplayTags = new Map();
+      const trimmedQuery = searchQuery.trim().toLowerCase();
+
+      nodeDataMap.forEach((nodeData) => {
+        if (matchedNodeIds.has(nodeData.board_id)) {
+          const matchingTag = nodeData.tags.find((t) =>
+            t.tag_name.toLowerCase().includes(trimmedQuery)
+          );
+          if (matchingTag) {
+            newDisplayTags.set(nodeData.board_id, matchingTag);
+          }
+        }
+      });
+
+      setNodeDisplayTags(newDisplayTags);
+    }, [searchQuery, matchedNodeIds, nodeDataMap]);
 
     const nodesById = useMemo(() => {
       if (!Array.isArray(nodeDataMap)) return new Map();
@@ -135,24 +172,25 @@ export const Timeline = forwardRef<
           const rect = timeline.getBoundingClientRect();
           const mouseX = e.clientX - rect.left; // 컨테이너 내 마우스 X 좌표
           const currentScrollLeft = timeline.scrollLeft;
-          
+
           // 2. 줌 변경량 계산
           const delta = -e.deltaY * 0.001;
-          
+
           setZoom((prevZoom) => {
             const newZoom = Math.max(0.25, Math.min(maxZoom, prevZoom + delta));
-            
+
             // 3. 줌 비율 (몇 배 커졌/작아졌는지)
             const zoomFactor = newZoom / prevZoom;
 
             // 4. 새로운 스크롤 위치 계산 (핵심 공식)
             // (현재 보고 있는 지점) * 비율 - (마우스 위치 보정)
             // 논리: 마우스가 가리키는 실제 데이터 지점은 변하지 않아야 함
-            const newScrollLeft = (currentScrollLeft + mouseX) * zoomFactor - mouseX;
+            const newScrollLeft =
+              (currentScrollLeft + mouseX) * zoomFactor - mouseX;
 
             // 5. 즉시 적용 (requestAnimationFrame 제거 - 동기화 문제 방지)
             if (timeline) {
-                timeline.scrollLeft = newScrollLeft;
+              timeline.scrollLeft = newScrollLeft;
             }
 
             return newZoom;
@@ -207,50 +245,144 @@ export const Timeline = forwardRef<
 
     const visibleRange = getVisibleRange();
 
+    // 줌 정도에 따라 "기간 버킷" 개수(= 동심원 중심 개수)를
+    // 기계적으로, 단계적으로 변화시키는 함수
+    const getPeriodBucketCount = (zoomLevel: number) => {
+      const BUCKET_DISABLE_THRESHOLD = 3.0; // 이 이상이면 버킷 해제 (clusterNodes에서 처리)
+      const HIGH_DENSE_START = 2.7; // 가장 촘촘한 구간 시작
+      const MID_DENSE_START = 2.3; // 그 직전 구간 시작
+
+      const MIN_BUCKETS_HIGH = 80; // 최상위 구간: 최소 70개 버킷
+      const MIN_BUCKETS_MID = 30; // 중간 구간: 최소 30개 버킷
+
+      // 1) 가장 촘촘한 구간: 2.7 ~ 3.0
+      if (
+        zoomLevel >= HIGH_DENSE_START &&
+        zoomLevel < BUCKET_DISABLE_THRESHOLD
+      ) {
+        const clampedZoom = Math.min(zoomLevel, 5);
+        const base =
+          1 + 6 * Math.log2(1 + clampedZoom) + 2 * Math.sqrt(clampedZoom);
+
+        return Math.max(MIN_BUCKETS_HIGH, Math.min(80, Math.round(base)));
+      }
+
+      // 2) 중간 촘촘 구간: 2.3 ~ 2.7
+      if (zoomLevel >= MID_DENSE_START && zoomLevel < HIGH_DENSE_START) {
+        const clampedZoom = Math.min(zoomLevel, 5);
+        const base =
+          1 + 6 * Math.log2(1 + clampedZoom) + 2 * Math.sqrt(clampedZoom);
+
+        return Math.max(MIN_BUCKETS_MID, Math.min(60, Math.round(base)));
+      }
+
+      // 3) 그 밖의 구간: 기본 기계적 증가 로직
+      const clampedZoom = Math.min(zoomLevel, 5); // 0 ~ 5 구간으로 클램프
+      const base =
+        1 + 6 * Math.log2(1 + clampedZoom) + 2 * Math.sqrt(clampedZoom);
+
+      // 최소 1, 최대 40 버킷 사이로 제한
+      const bucketCount = Math.max(1, Math.min(40, Math.round(base)));
+
+      return bucketCount;
+    };
+
+    // 기간(포지션 구간) 기준으로 노드를 묶어서
+    // 각 기간이 동심원 하나의 중심이 되도록 만드는 함수
     const clusterNodes = (nodes: typeof allNodes) => {
-      const sorted = [...nodes].sort((a, b) => a.position - b.position);
+      if (nodes.length === 0) return [];
+
+      // ✅ 충분히 확대되었을 때(zoom ≥ 3.0)는
+      // 같은 날짜(YYYY-MM-DD)끼리 묶어서 동심원 클러스터를 만든다
+      if (zoom >= 3.0) {
+        const clusters: Array<{
+          id: number;
+          centerPosition: number;
+          nodes: typeof allNodes;
+        }> = [];
+
+        const groups = new Map<string, typeof allNodes>();
+
+        // 날짜 키 기준으로 그룹화
+        nodes.forEach((node) => {
+          const nodeData = nodesById.get(node.id);
+          if (!nodeData || !nodeData.date) return;
+
+          const dateObj = new Date(nodeData.date);
+          const year = dateObj.getFullYear();
+          const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+          const day = String(dateObj.getDate()).padStart(2, "0");
+          const dateKey = `${year}-${month}-${day}`;
+
+          const arr = groups.get(dateKey);
+          if (arr) arr.push(node);
+          else groups.set(dateKey, [node]);
+        });
+
+        let clusterId = 0;
+        groups.forEach((groupNodes) => {
+          if (groupNodes.length === 0) return;
+
+          // 이 날짜 그룹의 중심 position (타임라인 상 x 위치)
+          const centerPos =
+            groupNodes.reduce((sum, n) => sum + n.position, 0) /
+            groupNodes.length;
+
+          clusters.push({
+            id: clusterId++,
+            centerPosition: centerPos,
+            nodes: groupNodes, // 같은 날짜 노드들이 한 클러스터 안에 모임
+          });
+        });
+
+        return clusters;
+      }
+
+      // ⬇️ zoom < 3.0 에서는 기존 버킷(기간) 기반 클러스터링 유지
+      const bucketCount = getPeriodBucketCount(zoom);
+      const bucketWidth = 100 / bucketCount;
+
+      const buckets: Array<{
+        id: number;
+        centerPosition: number;
+        nodes: typeof allNodes;
+      }> = [];
+
+      for (let i = 0; i < bucketCount; i++) {
+        buckets.push({
+          id: i,
+          centerPosition: 0,
+          nodes: [],
+        });
+      }
+
+      // 각 노드를 0~100% 구간 기준으로 버킷에 할당
+      nodes.forEach((node) => {
+        const rawIndex = Math.floor(node.position / bucketWidth);
+        const bucketIndex = Math.min(bucketCount - 1, Math.max(0, rawIndex));
+        buckets[bucketIndex].nodes.push(node);
+      });
+
       const clusters: Array<{
         id: number;
         centerPosition: number;
         nodes: typeof allNodes;
       }> = [];
 
-      const clusterThreshold = 0.6 / zoom;
-      let currentCluster: typeof allNodes = [];
-      let clusterId = 0;
+      buckets.forEach((bucket) => {
+        if (bucket.nodes.length === 0) return;
 
-      sorted.forEach((node, index) => {
-        if (currentCluster.length === 0) {
-          currentCluster.push(node);
-        } else {
-          const lastNode = currentCluster[currentCluster.length - 1];
-          const distance = Math.abs(node.position - lastNode.position);
+        const centerPos =
+          bucket.nodes.reduce((sum, n) => sum + n.position, 0) /
+          bucket.nodes.length;
 
-          if (distance <= clusterThreshold) {
-            currentCluster.push(node);
-          } else {
-            const centerPos =
-              currentCluster.reduce((sum, n) => sum + n.position, 0) /
-              currentCluster.length;
-            clusters.push({
-              id: clusterId++,
-              centerPosition: centerPos,
-              nodes: [...currentCluster],
-            });
-            currentCluster = [node];
-          }
-        }
-        if (index === sorted.length - 1 && currentCluster.length > 0) {
-          const centerPos =
-            currentCluster.reduce((sum, n) => sum + n.position, 0) /
-            currentCluster.length;
-          clusters.push({
-            id: clusterId++,
-            centerPosition: centerPos,
-            nodes: [...currentCluster],
-          });
-        }
+        clusters.push({
+          id: bucket.id,
+          centerPosition: centerPos,
+          nodes: bucket.nodes,
+        });
       });
+
       return clusters;
     };
 
@@ -262,9 +394,108 @@ export const Timeline = forwardRef<
       isHovered: boolean
     ) => {
       if (clusterSize === 1) return { x: 0, y: 0 };
-      const baseRadius = isHovered ? 30 : 20;
-      const radius = baseRadius + (clusterSize > 6 ? (clusterSize - 6) * 4 : 0);
-      const angle = (index / clusterSize) * Math.PI * 2 - Math.PI / 2;
+
+      // 동심원 방식: 반지름이 커질수록 그 링이 수용할 수 있는 노드 개수(capacity)가 늘어나고,
+      // 바깥 링이 너무 비어 보이지 않도록 링 개수와 배치를 동적으로 조정한다.
+      const nodeSize = 24; // 노드 직경(px)
+      const minSpacing = 8; // 노드 간 최소 간격(px)
+      const spacingPerNode = nodeSize + minSpacing; // 노드 하나가 차지하는 둘레 길이
+
+      const baseRadius = isHovered ? 20 : 15; // 첫 번째 링 반지름
+      const radiusStep = 25; // 링이 하나 늘어날 때마다 반지름 증가
+      const MAX_RINGS = 8; // 한 클러스터에서 사용할 수 있는 최대 링 개수
+      const MIN_FILL_RATIO = 0.4; // 마지막 링이 이 비율보다 적게 채워지면 링 개수를 줄여서 재배치
+
+      // 1) 각 링의 반지름과 수용 가능 노드 수(capacity) 계산
+      const radii: number[] = [];
+      const capacities: number[] = [];
+      for (let ring = 0; ring < MAX_RINGS; ring++) {
+        const radius = baseRadius + ring * radiusStep;
+        const circumference = 2 * Math.PI * radius;
+        const capacity = Math.max(
+          3, // 최소 3개는 보장
+          Math.floor(circumference / spacingPerNode)
+        );
+        radii.push(radius);
+        capacities.push(capacity);
+      }
+
+      // 2) 최소한 clusterSize를 커버할 수 있는 가장 작은 링 개수 선택
+      let ringCount = 1;
+      for (let r = 1; r <= MAX_RINGS; r++) {
+        const totalCap = capacities.slice(0, r).reduce((sum, c) => sum + c, 0);
+        if (totalCap >= clusterSize) {
+          ringCount = r;
+          break;
+        }
+      }
+
+      // 3) 주어진 ringCount에서 각 링에 실제로 몇 개의 노드를 배치할지 계산
+      const computeLayout = (rings: number) => {
+        const nodesPerRing: number[] = new Array(rings).fill(0);
+        let remaining = clusterSize;
+
+        for (let i = 0; i < rings; i++) {
+          const take = Math.min(capacities[i], remaining);
+          nodesPerRing[i] = take;
+          remaining -= take;
+        }
+
+        // capacity를 다 써도 남는 노드가 있다면 마지막 링에 몰아넣기
+        if (remaining > 0) {
+          nodesPerRing[rings - 1] += remaining;
+        }
+
+        return nodesPerRing;
+      };
+
+      let nodesPerRing = computeLayout(ringCount);
+
+      // 4) 마지막 링이 너무 비어 있거나,
+      //    바깥 링의 노드 수가 바로 안쪽 링보다 많지 않으면
+      //    링 개수를 줄여서 재배치
+      while (ringCount > 1) {
+        const lastCapacity = capacities[ringCount - 1];
+        const lastNodes = nodesPerRing[ringCount - 1];
+        const prevNodes = nodesPerRing[ringCount - 2];
+        const fillRatio = lastNodes / lastCapacity;
+        const outerMoreThanInner = lastNodes > prevNodes;
+
+        if (fillRatio >= MIN_FILL_RATIO && outerMoreThanInner) break;
+
+        ringCount -= 1;
+        nodesPerRing = computeLayout(ringCount);
+      }
+
+      // 5) 각 링의 시작 인덱스(prefix sum) 계산
+      const ringStartIndex: number[] = new Array(ringCount).fill(0);
+      {
+        let acc = 0;
+        for (let i = 0; i < ringCount; i++) {
+          ringStartIndex[i] = acc;
+          acc += nodesPerRing[i];
+        }
+      }
+
+      // 6) 주어진 index가 어느 링에 속하는지, 그 링 안에서 몇 번째인지 계산
+      let ringIndex = ringCount - 1;
+      let indexInRing = 0;
+      for (let i = 0; i < ringCount; i++) {
+        const start = ringStartIndex[i];
+        const end = start + nodesPerRing[i];
+        if (index >= start && index < end) {
+          ringIndex = i;
+          indexInRing = index - start;
+          break;
+        }
+      }
+
+      const radius = radii[ringIndex];
+      const nodesInThisRing = Math.max(1, nodesPerRing[ringIndex]);
+
+      // 링 안에서는 항상 균등 분포로 배치 → 원형이 유지됨
+      const angle = (indexInRing / nodesInThisRing) * Math.PI * 2 - Math.PI / 2;
+
       return {
         x: Math.cos(angle) * radius,
         y: Math.sin(angle) * radius,
@@ -423,7 +654,7 @@ export const Timeline = forwardRef<
         {/* Timeline Container */}
         <div
           ref={timelineRef}
-          className="relative w-full h-60 overflow-x-auto overflow-y-hidden timeline-container"
+          className="relative w-full h-60 overflow-x-auto overflow-y-hidden timeline-container px-8"
         >
           <div
             className="relative h-full"
@@ -525,12 +756,45 @@ export const Timeline = forwardRef<
             {allNodes.map((node) => {
               const nodeData = nodesById.get(node.id);
               if (!nodeData) return null;
-              const nodeTag = nodeData.tags[0];
 
-              const isSearching = searchQuery.trim().length > 0;
+              const isSearching = matchedNodeIds.size > 0;
               const isMatched = matchedNodeIds.has(node.id);
               const shouldDim = isSearching && !isMatched;
               const shouldHighlight = isSearching && isMatched;
+
+              let displayTag = nodeData.tags[0];
+
+              if (isMatched) {
+                // 1) 태그 필터링이 활성화된 경우
+                if (selectedFilterTags.length > 0) {
+                  const matchingFilterTag = nodeData.tags.find((t) =>
+                    selectedFilterTags.some(
+                      (selectedTag) =>
+                        selectedTag.name === t.tag_name &&
+                        selectedTag.color === t.tag_color
+                    )
+                  );
+                  if (matchingFilterTag) {
+                    displayTag = matchingFilterTag;
+                  }
+                }
+                // 2) 검색어가 있는 경우
+                else if (searchQuery && searchQuery.trim().length > 0) {
+                  const trimmedQuery = searchQuery.trim().toLowerCase();
+
+                  // 정확한 일치 우선
+                  const exactMatch = nodeData.tags.find(
+                    (t) => t.tag_name.toLowerCase() === trimmedQuery
+                  );
+
+                  // 부분 일치
+                  const partialMatch = nodeData.tags.find((t) =>
+                    t.tag_name.toLowerCase().includes(trimmedQuery)
+                  );
+
+                  displayTag = exactMatch || partialMatch || displayTag;
+                }
+              }
 
               const clusterInfo = getNodeClusterInfo(node.id);
               const offset = clusterInfo
@@ -549,12 +813,13 @@ export const Timeline = forwardRef<
               return (
                 <div
                   key={node.id}
+                  data-node-id={node.id}
                   className="absolute cursor-pointer z-10"
                   style={{
                     left: `${displayPosition}%`,
                     top: "50%",
                     transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))`,
-                    opacity: shouldDim ? 0.2 : 1,
+                    opacity: shouldDim ? 0.15 : 1,
                     transition: "all 0.3s ease",
                   }}
                   onClick={(e) => handleNodeClick(e, node)}
@@ -571,7 +836,7 @@ export const Timeline = forwardRef<
                     className="w-6 h-6 transition-all"
                     style={{
                       borderRadius: "50%",
-                      backgroundColor: nodeTag?.tag_color || "#F2F0EB",
+                      backgroundColor: displayTag.tag_color || "#F2F0EB",
                       border: shouldHighlight
                         ? "3px solid black"
                         : isSelected
@@ -598,9 +863,20 @@ export const Timeline = forwardRef<
 
             if (!node || !nodeData || !timelineRef.current) return null;
 
-            const nodeTag = nodeData.tags[0];
-            const nodeDate = new Date(nodeData.date);
+            // 날짜/시간은 문자열 기반으로 처리하여 타임존 보정에 영향을 받지 않도록 함
+            const rawDate = nodeData.date as string | null;
+            const rawTime = (nodeData as any).time as string | null;
 
+            let formattedDate = rawDate || "";
+            if (rawDate) {
+              const parts = rawDate.split("-");
+              if (parts.length === 3) {
+                const [y, m, d] = parts;
+                formattedDate = `${y}/${m}/${d}`;
+              }
+            }
+
+            const container = timelineRef.current;
             const clusterInfo = getNodeClusterInfo(node.id);
             const offset = clusterInfo
               ? getNodeOffset(
@@ -610,25 +886,27 @@ export const Timeline = forwardRef<
                 )
               : { x: 0, y: 0 };
 
-            const displayPosition = clusterInfo
-              ? clusterInfo.cluster.centerPosition
-              : node.position;
+            // 실제 DOM 상의 노드 중심 좌표를 사용하여 선/툴팁 위치 계산
+            const nodeElement = container.querySelector(
+              `[data-node-id="${node.id}"]`
+            ) as HTMLDivElement | null;
 
-            // 실시간 좌표 계산
-            const container = timelineRef.current;
-            const rect = container.getBoundingClientRect();
-            const scrollLeft = container.scrollLeft;
-            const totalContentWidth = rect.width * 4 * zoom;
+            if (!nodeElement) return null;
 
-            const currentX =
-              rect.left +
-              totalContentWidth * (displayPosition / 100) -
-              scrollLeft +
-              offset.x;
-            const currentY = rect.top + rect.height / 2 + offset.y;
+            const nodeRect = nodeElement.getBoundingClientRect();
+            const currentX = nodeRect.left + nodeRect.width / 2;
+            const currentY = nodeRect.top + nodeRect.height / 2;
 
-            const nodeRadius = 18;
+            const nodeRadius = nodeRect.height / 2;
             const lineStartY = currentY + nodeRadius;
+
+            // 디버깅용: 연결선 기준 좌표 확인
+            console.debug("[Timeline] tooltip anchor", {
+              nodeId: node.id,
+              nodeRect,
+              currentX,
+              currentY,
+            });
 
             return (
               <>
@@ -639,7 +917,7 @@ export const Timeline = forwardRef<
                     top: `${lineStartY}px`,
                     bottom: "80px",
                     width: "2px",
-                    zIndex: 999, // 정보창(1000)
+                    zIndex: 5, // 노드(z-10)보다 뒤에 위치하도록 조정
                   }}
                 />
                 <div
@@ -655,7 +933,7 @@ export const Timeline = forwardRef<
                     maxWidth: "250px",
                   }}
                 >
-                  {nodeData.date && (
+                  {rawDate && (
                     <div className="mb-1">
                       <span
                         style={{
@@ -663,34 +941,34 @@ export const Timeline = forwardRef<
                           fontFamily: "'JetBrains Mono', monospace",
                         }}
                       >
-                        {nodeDate.getFullYear()}/
-                        {String(nodeDate.getMonth() + 1).padStart(2, "0")}/
-                        {String(nodeDate.getDate()).padStart(2, "0")}
+                        {formattedDate}
                       </span>
-                      {(nodeDate.getHours() !== 0 ||
-                        nodeDate.getMinutes() !== 0) && (
-                        <span>
-                          {" "}
-                          {String(nodeDate.getHours()).padStart(2, "0")}:
-                          {String(nodeDate.getMinutes()).padStart(2, "0")}
-                        </span>
+                      {rawTime && rawTime !== "00:00:00" && (
+                        <span> {rawTime.slice(0, 5)}</span>
                       )}
                     </div>
                   )}
-                  {nodeTag && (
-                    <div className="mb-1 flex items-center gap-1">
-                      <div
-                        style={{
-                          width: "8px",
-                          height: "8px",
-                          borderRadius: "50%",
-                          backgroundColor: nodeTag.tag_color,
-                          border: "1px solid black",
-                        }}
-                      />
-                      <span>{nodeTag.tag_name}</span>
-                    </div>
-                  )}
+                  <div className="mb-1 flex flex-row items-center gap-3">
+                    {nodeData.tags.map((tag) => {
+                      return (
+                        <div
+                          className="flex items-center gap-1"
+                          key={tag.tag_id}
+                        >
+                          <div
+                            style={{
+                              width: "8px",
+                              height: "8px",
+                              borderRadius: "50%",
+                              backgroundColor: tag.tag_color,
+                              border: "1px solid black",
+                            }}
+                          />
+                          <span>{tag.tag_name}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                   {nodeData.description && (
                     <div
                       className="mt-1 pt-1"

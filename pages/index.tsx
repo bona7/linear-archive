@@ -1,17 +1,15 @@
-import { Timeline } from "@/design/components/Timeline";
-import { Toolbar } from "@/design/components/Toolbar";
-import { ArchiveModal } from "@/design/components/ArchiveModal";
-import { ViewArchiveModal } from "@/design/components/ViewArchiveModal";
-import { SearchBar } from "@/design/components/SearchBar";
-import { LoginModal } from "@/design/components/LoginModal";
-import { ProfileMenu } from "@/design/components/ProfileMenu";
-import { QuickInsight } from "@/design/components/QuickInsight";
+import { Timeline } from "@/components/Timeline";
+import { Toolbar } from "@/components/Toolbar";
+import { ArchiveModal } from "@/components/ArchiveModal";
+import { ViewArchiveModal } from "@/components/ViewArchiveModal";
+import { SearchBar } from "@/components/SearchBar";
+import { LoginModal } from "@/components/LoginModal";
+import { ProfileMenu } from "@/components/ProfileMenu";
+import { QuickInsight } from "@/components/QuickInsight";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { NodeData, NodeTag } from "@/commons/types/types";
-import {
-  signOut,
-  getSession,
-} from "@/commons/libs/supabase/auth";
+import { signOut, getSession } from "@/commons/libs/supabase/auth";
+import { AnalysisPanel } from "@/components/AnalysisPanel";
 import {
   BoardWithTags,
   Tag,
@@ -19,7 +17,6 @@ import {
   getCurrentUserTags,
 } from "@/commons/libs/supabase/db";
 import { useRouter } from "next/router";
-import { AnalysisPanel } from "@/design/components/AnalysisPanel";
 import {
   LoadingOverlay,
   LoadingIcon,
@@ -66,14 +63,14 @@ export default function App() {
   const [quickInsight, setQuickInsight] = useState<string | null>(null);
   const { minYear, maxYear } = useMemo(() => {
     const currentYear = new Date().getFullYear();
-    
+
     if (boards.length === 0) {
       return { minYear: currentYear - 1, maxYear: currentYear + 1 };
     }
 
     const years = boards
-      .map(b => b.date ? new Date(b.date).getFullYear() : currentYear)
-      .filter(y => !isNaN(y));
+      .map((b) => (b.date ? new Date(b.date).getFullYear() : currentYear))
+      .filter((y) => !isNaN(y));
 
     if (years.length === 0) {
       return { minYear: currentYear - 1, maxYear: currentYear + 1 };
@@ -81,7 +78,7 @@ export default function App() {
 
     return {
       minYear: Math.min(...years), // 가장 과거 노드의 연도
-      maxYear: Math.max(...years, currentYear) // 오늘 날짜
+      maxYear: Math.max(...years, currentYear), // 오늘 날짜
     };
   }, [boards]);
 
@@ -97,9 +94,7 @@ export default function App() {
         board.tags.length > 0
           ? { name: board.tags[0].tag_name, color: board.tags[0].tag_color }
           : undefined,
-      date: board.date
-        ? new Date(`${board.date}T${"00:00:00"}`)
-        : undefined,
+      date: board.date ? new Date(`${board.date}T${"00:00:00"}`) : undefined,
     };
   }
 
@@ -145,8 +140,10 @@ export default function App() {
     checkUser();
     // Expose backfill tool to console
     import("@/utils/backfill-has-image").then((mod) => {
-        (window as any).backfillHasImage = mod.backfillHasImage;
-        console.log("backfillHasImage helper loaded. Run window.backfillHasImage() to populate has_image column.");
+      (window as any).backfillHasImage = mod.backfillHasImage;
+      console.log(
+        "backfillHasImage helper loaded. Run window.backfillHasImage() to populate has_image column."
+      );
     });
   }, []);
 
@@ -371,7 +368,7 @@ export default function App() {
         (t) => t.name === tag.name && t.color === tag.color
       );
 
-      let newSelectedTags;
+      let newSelectedTags: NodeTag[];
       if (isSelected) {
         newSelectedTags = prev.filter(
           (t) => !(t.name === tag.name && t.color === tag.color)
@@ -398,7 +395,7 @@ export default function App() {
           }
         });
         setMatchedNodeIds(matches);
-        setSearchQuery("Tag fliter Activated");
+        setSearchQuery("");
       }
 
       return newSelectedTags;
@@ -429,10 +426,6 @@ export default function App() {
     }
   }, [router.query, router]);
 
-  useEffect(() => {
-    console.log("isSignUpMode:", isSignUpMode);
-  }, [isSignUpMode]);
-
   return (
     <>
       {/* Login Modal (z-index 50) - 헤더보다 위에 위치 */}
@@ -456,51 +449,70 @@ export default function App() {
         />
       )}
 
-      {/* [수정됨] Header 
-        - z-index: 50 (배경보다 무조건 위에 있어야 함)
-        - pointer-events-none: 클릭 통과 (하위 버튼들은 auto로 설정)
-      */}
-      <header className="fixed top-0 left-0 right-0 pt-8 pb-8 pointer-events-none z-50">
-        {/* User Nickname */}
-        {user && (
-          <div
-            className="text-center mb-4 transition-all duration-700 ease-out"
-            style={{
-              opacity: user ? 1 : 0,
-              transform: user ? "translateY(0)" : "translateY(-20px)",
-            }}
-          >
-            <span
-              className="tracking-tight"
+      {/* [수정됨] Header - 반응형 패딩 */}
+      <header
+        className="fixed top-0 left-0 right-0 pointer-events-none z-50"
+        style={{
+          paddingTop: "clamp(1rem, 2vw, 2rem)",
+          paddingBottom: "clamp(1rem, 2vw, 2rem)",
+        }}
+      >
+        {user ? (
+          <>
+            <div
+              className="text-center mb-4 transition-all duration-700 ease-out"
               style={{
-                fontFamily: "Georgia, 'Pretendard', sans-serif",
-                fontSize: "48px",
-                fontWeight: "bold",
-                lineHeight: "1",
+                opacity: user ? 1 : 0,
+                transform: user ? "translateY(0)" : "translateY(-20px)",
               }}
             >
-              {displayNameValue}'s
-            </span>
-          </div>
+              <span
+                className="tracking-tight"
+                style={{
+                  fontFamily: "Georgia, 'Pretendard', sans-serif",
+                  fontSize: "clamp(20px, 4vw, 40px)",
+                  fontWeight: "bold",
+                  lineHeight: "1",
+                }}
+              >
+                Linear Archive
+              </span>
+            </div>
+            <h1
+              className="text-center tracking-tight transition-all duration-700 ease-out"
+              style={{
+                fontFamily: "Georgia, sans-serif",
+                fontSize: "clamp(48px, 8vw, 90px)",
+                fontWeight: "bold",
+                lineHeight: "1",
+                transform: user ? "translateY(0)" : "translateY(40px)",
+                opacity: isSignUpMode ? 0 : 1,
+                visibility: isSignUpMode ? "hidden" : "visible",
+              }}
+            >
+              {displayNameValue}'s Line
+            </h1>
+          </>
+        ) : (
+          <h1
+            className="text-center tracking-tight transition-all duration-700 ease-out"
+            style={{
+              fontFamily: "Georgia, sans-serif",
+              fontSize: "clamp(48px, 8vw, 96px)",
+              fontWeight: "bold",
+              lineHeight: "1",
+              transform: user ? "translateY(0)" : "translateY(40px)",
+              opacity: isSignUpMode ? 0 : 1,
+              visibility: isSignUpMode ? "hidden" : "visible",
+            }}
+          >
+            Linear Archive
+          </h1>
         )}
-
-        {/* Linear Archive Title - 조건문 제거, 항상 렌더링 */}
-        <h1
-          className="text-center tracking-tight transition-all duration-700 ease-out"
-          style={{
-            fontFamily: "Georgia, sans-serif",
-            fontSize: "96px",
-            fontWeight: "bold",
-            lineHeight: "1",
-            transform: user ? "translateY(0)" : "translateY(40px)",
-          }}
-        >
-          Linear Archive
-        </h1>
 
         {/* Toolbar */}
         {user && (
-          <div className="flex justify-center mt-6 pointer-events-auto">
+          <div className="flex justify-center mt-8 pointer-events-auto">
             <Toolbar
               onNewArchive={handleToolbarNewArchive}
               onDateSelect={handleDateSelect}
@@ -512,14 +524,13 @@ export default function App() {
         )}
       </header>
 
-      {/* [수정됨] Main Content Background
-        - z-index: 0 (가장 뒤로 보내서 헤더를 덮지 않게 함)
-      */}
+      {/* [수정됨] Main Content Background - 뷰포트 기반 높이 */}
       <div
-        className={`min-h-screen bg-[#F2F0EB] relative overflow-hidden flex flex-col transition-all duration-500 z-0 ${
+        className={`bg-[#F2F0EB] relative overflow-auto flex flex-col transition-all duration-500 z-0 ${
           !user ? "blur-[2px]" : "blur-0"
         }`}
         style={{
+          height: "calc(var(--vh, 1vh) * 100)",
           backgroundImage: `
             radial-gradient(circle, rgba(0, 0, 0, 0.15) 1px, transparent 1px),
             url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' /%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23noise)' opacity='0.06'/%3E%3C/svg%3E")
@@ -527,15 +538,19 @@ export default function App() {
           backgroundSize: "24px 24px, 400px 400px",
         }}
       >
-        {/* Header Spacer - 헤더 높이만큼 공간 확보 */}
+        {/* Header Spacer - 반응형 높이 (뷰포트 비율 기반) */}
         <div
           className="transition-all duration-700 ease-out"
-          style={{ height: user ? "320px" : "280px" }}
+          style={{
+            height: user
+              ? "clamp(200px, 30vh, 320px)"
+              : "clamp(180px, 28vh, 280px)",
+          }}
         />
 
         {/* Search Bar */}
         {isSearching && (
-          <div className="pb-8 pt-4">
+          <div className="pb-4 pt-4">
             <SearchBar
               onSearch={handleSearch}
               onClose={handleCloseSearch}
@@ -545,21 +560,28 @@ export default function App() {
         )}
 
         {/* Tags List */}
-        <div className="flex justify-center overflow-hidden p-8 space-x-8">
+        <div
+          className="flex justify-center overflow-hidden p-8 space-x-8"
+          style={{ marginTop: "1rem" }}
+        >
           {tags.map((tag, index) => {
-            const isSelected = selectedFilterTags.some(
-              (t) => t.name === tag.name && t.color === tag.color
-            );
+            const hasFilter = selectedFilterTags.length > 0;
+            const isSelected = hasFilter
+              ? selectedFilterTags.some(
+                  (t) => t.name === tag.name && t.color === tag.color
+                )
+              : false;
+            const buttonClass = hasFilter
+              ? isSelected
+                ? "border-black bg-white opacity-100 shadow-sm"
+                : "border-gray-300 bg-[#F2F0EB] opacity-50 hover:opacity-80"
+              : "border-gray-300 bg-[#F2F0EB] opacity-100 hover:border-black";
 
             return (
               <button
                 key={index}
                 onClick={() => handleTagClick(tag)}
-                className={`border px-2.5 py-1.5 flex items-center gap-1.5 transition-all shrink-0 ${
-                  isSelected
-                    ? "border-black bg-white opacity-100 shadow-sm"
-                    : "border-gray-300 bg-[#F2F0EB] opacity-60 hover:opacity-100"
-                }`}
+                className={`border px-2.5 py-1.5 flex items-center gap-1.5 transition-all shrink-0 ${buttonClass}`}
               >
                 <div
                   className="border border-black"
@@ -591,6 +613,7 @@ export default function App() {
             searchQuery={searchQuery}
             matchedNodeIds={matchedNodeIds}
             ref={timelineRef}
+            selectedFilterTags={selectedFilterTags}
           />
 
           {/* Quick Insight - Below Timeline */}
@@ -599,12 +622,9 @@ export default function App() {
       </div>
 
       {/* Modals & Menu (z-index는 컴포넌트 내부나 fixed로 제어됨) */}
-      
+
       {user && (
-        <ProfileMenu
-          onLogout={handleLogout}
-          userNickname={displayNameValue}
-        />
+        <ProfileMenu onLogout={handleLogout} userNickname={displayNameValue} />
       )}
 
       {(() => {
