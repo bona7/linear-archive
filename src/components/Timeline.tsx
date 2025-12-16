@@ -48,7 +48,8 @@ export const Timeline = forwardRef<
     const timelineRef = useRef<HTMLDivElement>(null);
 
     // [추가] 줌이 바뀐 직후에 이동할 스크롤 위치를 잠시 저장해두는 변수
-    const pendingZoomScroll = useRef<number | null>(null);
+    // [수정] 숫자(검색)와 객체(휠 줌) 둘 다 받을 수 있게 타입 변경!
+    const pendingZoomScroll = useRef<number | { ratio: number; mouseX: number } | null>(null);
 
     const [nodeDisplayTags, setNodeDisplayTags] = useState<
       Map<number | string, any>
@@ -119,12 +120,28 @@ export const Timeline = forwardRef<
     }, [totalDays]);
 
     // [추가] 렌더링 직후(DOM 업데이트 후)에 예약된 스크롤 위치로 이동
+    // [수정] 렌더링 직후 스크롤 보정 (숫자/객체 타입 체크 추가)
     useLayoutEffect(() => {
       if (timelineRef.current && pendingZoomScroll.current !== null) {
-        timelineRef.current.scrollLeft = pendingZoomScroll.current;
-        pendingZoomScroll.current = null; // 이동했으니 예약표 파기
+        const timeline = timelineRef.current;
+        const pending = pendingZoomScroll.current;
+
+        // Case A: 숫자일 때 (스마트 검색 - 날짜 이동)
+        if (typeof pending === "number") {
+          timeline.scrollLeft = pending;
+        } 
+        // Case B: 객체일 때 (휠 줌 - 마우스 위치 유지)
+        else {
+          const { ratio, mouseX } = pending;
+          const newScrollWidth = timeline.scrollWidth;
+          const newPointPosition = newScrollWidth * ratio;
+          timeline.scrollLeft = newPointPosition - mouseX;
+        }
+
+        // 처리 완료 후 비우기
+        pendingZoomScroll.current = null;
       }
-    }, [zoom]); // zoom이 바뀔 때마다 실행
+    }, [zoom]);
 
     const dateToPosition = (date: Date) => {
       const daysSinceStart =
@@ -164,7 +181,7 @@ export const Timeline = forwardRef<
       }
     };
 
-    // 마우스 휠 이벤트 핸들러 - 줌 로직 안정화
+    // [수정] 휠 줌 로직 개선
     useEffect(() => {
       const timeline = timelineRef.current;
       if (!timeline) return;
@@ -174,30 +191,37 @@ export const Timeline = forwardRef<
           e.preventDefault();
           e.stopPropagation();
 
-          // 1. 현재 상태 캡처
           const rect = timeline.getBoundingClientRect();
-          const mouseX = e.clientX - rect.left; // 컨테이너 내 마우스 X 좌표
+          const mouseX = e.clientX - rect.left;
+          
           const currentScrollLeft = timeline.scrollLeft;
-
-          // 2. 줌 변경량 계산
-          const delta = -e.deltaY * 0.001;
+          const currentScrollWidth = timeline.scrollWidth;
+          const mouseRatio = (currentScrollLeft + mouseX) / currentScrollWidth;
 
           setZoom((prevZoom) => {
-            const newZoom = Math.max(0.25, Math.min(maxZoom, prevZoom + delta));
+            // [핵심] 현재 보이는 날짜 수(visibleDays)를 기준으로 줌 속도 가속
+            const currentVisibleDays = totalDays / prevZoom;
+            let speedFactor = 1.0; // 기본 속도
 
-            // 3. 줌 비율 (몇 배 커졌/작아졌는지)
-            const zoomFactor = newZoom / prevZoom;
-
-            // 4. 새로운 스크롤 위치 계산 (핵심 공식)
-            // (현재 보고 있는 지점) * 비율 - (마우스 위치 보정)
-            // 논리: 마우스가 가리키는 실제 데이터 지점은 변하지 않아야 함
-            const newScrollLeft =
-              (currentScrollLeft + mouseX) * zoomFactor - mouseX;
-
-            // 5. 즉시 적용 (requestAnimationFrame 제거 - 동기화 문제 방지)
-            if (timeline) {
-              timeline.scrollLeft = newScrollLeft;
+            // 1. 7일 단위 or 일일 단위가 보일 때 (아주 확대된 상태)
+            //    -> 더욱 팍팍 확대 (3배속)
+            if (currentVisibleDays < 450) {
+                speedFactor = 3; 
             }
+            // 2. 14일 단위 날짜 표시선이 보일 때 (어느 정도 확대된 상태)
+            //    -> 적당히 팍팍 확대 (2배속)
+            else if (currentVisibleDays < 1000) {
+                speedFactor = 2;
+            }
+            // 3. 그 외 (년/월 단위 등 축소된 상태) -> 기본 속도(1.0) 유지
+
+            // 계산된 가속도(speedFactor)를 delta에 곱해줌
+            const delta = -e.deltaY * 0.001 * speedFactor;
+
+            const newZoom = Math.max(0.25, Math.min(maxZoom, prevZoom + delta));
+            
+            // 비율 기반 앵커링 (화면 밖 이탈 방지 유지)
+            pendingZoomScroll.current = { ratio: mouseRatio, mouseX: mouseX };
 
             return newZoom;
           });
@@ -219,7 +243,7 @@ export const Timeline = forwardRef<
         timeline.removeEventListener("gesturechange", preventGesture);
         timeline.removeEventListener("gestureend", preventGesture);
       };
-    }, [maxZoom]);
+    }, [maxZoom, totalDays]); // totalDays 의존성 추가
 
     const getDateFromPosition = (position: number) => {
       const daysOffset = (position / 100) * totalDays;
