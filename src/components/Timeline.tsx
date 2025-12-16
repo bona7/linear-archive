@@ -46,6 +46,10 @@ export const Timeline = forwardRef<
       null
     );
     const timelineRef = useRef<HTMLDivElement>(null);
+
+    // [추가] 줌이 바뀐 직후에 이동할 스크롤 위치를 잠시 저장해두는 변수
+    const pendingZoomScroll = useRef<number | null>(null);
+
     const [nodeDisplayTags, setNodeDisplayTags] = useState<
       Map<number | string, any>
     >(new Map());
@@ -114,11 +118,13 @@ export const Timeline = forwardRef<
       return Math.max(1, Math.min(100, calculatedMax));
     }, [totalDays]);
 
+    // [추가] 렌더링 직후(DOM 업데이트 후)에 예약된 스크롤 위치로 이동
     useLayoutEffect(() => {
-      if (timelineRef.current) {
-        timelineRef.current.scrollLeft = timelineRef.current.scrollWidth;
+      if (timelineRef.current && pendingZoomScroll.current !== null) {
+        timelineRef.current.scrollLeft = pendingZoomScroll.current;
+        pendingZoomScroll.current = null; // 이동했으니 예약표 파기
       }
-    }, []);
+    }, [zoom]); // zoom이 바뀔 때마다 실행
 
     const dateToPosition = (date: Date) => {
       const daysSinceStart =
@@ -607,14 +613,41 @@ export const Timeline = forwardRef<
 
     const dateLabels = getDateLabels();
 
+    // [복구] 스마트 줌 & 자동 확대 (가장자리 날짜 중앙 정렬)
     const scrollToDate = (date: Date) => {
-      const daysSinceStart =
-        (date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-      const scrollPercentage = (daysSinceStart / totalDays) * 100;
+      const totalMs = endDate.getTime() - startDate.getTime();
+      const targetMs = date.getTime() - startDate.getTime();
+      const ratio = Math.max(0, Math.min(1, targetMs / totalMs));
+
+      // 1. 가장자리에 얼마나 가까운지 계산 (0에 가까울수록 끝부분)
+      const distFromEdge = Math.min(ratio, 1 - ratio);
+      const safeDist = Math.max(distFromEdge, 0.001); 
+      
+      // 2. 중앙 정렬을 위해 필요한 최소 배율 역산 (1/8 공식)
+      const requiredZoom = 1 / (8 * safeDist);
+      const targetZoom = Math.max(zoom, Math.min(maxZoom, requiredZoom));
+
       if (timelineRef.current) {
-        const maxScroll =
-          timelineRef.current.scrollWidth - timelineRef.current.clientWidth;
-        timelineRef.current.scrollLeft = (scrollPercentage / 100) * maxScroll;
+        const container = timelineRef.current;
+        
+        // 3. 줌이 변경되어야 한다면? -> 스크롤 예약 걸고 줌 실행
+        if (targetZoom > zoom) {
+           // 타임라인 전체 너비 예측 (컨테이너 * 4 * 목표배율)
+           const totalScrollWidth = container.clientWidth * 4 * targetZoom; 
+           const centerOffset = container.clientWidth / 2;
+           const newScrollLeft = (ratio * totalScrollWidth) - centerOffset;
+           
+           pendingZoomScroll.current = newScrollLeft; // 예약!
+           setZoom(targetZoom); // 확대!
+        } 
+        // 4. 줌 변경 필요 없으면? -> 그냥 부드럽게 이동
+        else {
+           const totalScrollWidth = container.scrollWidth;
+           const centerOffset = container.clientWidth / 2;
+           const newScrollLeft = (ratio * totalScrollWidth) - centerOffset;
+           
+           container.scrollTo({ left: newScrollLeft, behavior: 'smooth' });
+        }
       }
     };
 
