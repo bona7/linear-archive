@@ -775,6 +775,7 @@ export const Timeline = forwardRef<
 
               const isSearching = matchedNodeIds.size > 0;
               const isMatched = matchedNodeIds.has(node.id);
+
               const shouldDim = isSearching && !isMatched;
               const shouldHighlight = isSearching && isMatched;
 
@@ -835,7 +836,11 @@ export const Timeline = forwardRef<
                     left: `${displayPosition}%`,
                     top: "50%",
                     transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))`,
+                    
+                    //수정: 블러 적용
                     opacity: shouldDim ? 0.15 : 1,
+                    filter: shouldDim ? "blur(1.2px)" : "none", // 1.2px 블러 처리
+
                     transition: "all 0.3s ease",
                   }}
                   onClick={(e) => handleNodeClick(e, node)}
