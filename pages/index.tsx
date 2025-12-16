@@ -308,7 +308,7 @@ export default function App() {
         (t) => t.name === tag.name && t.color === tag.color
       );
 
-      let newSelectedTags;
+      let newSelectedTags: NodeTag[];
       if (isSelected) {
         newSelectedTags = prev.filter(
           (t) => !(t.name === tag.name && t.color === tag.color)
@@ -335,7 +335,7 @@ export default function App() {
           }
         });
         setMatchedNodeIds(matches);
-        setSearchQuery("Tag fliter Activated");
+        setSearchQuery("");
       }
 
       return newSelectedTags;
@@ -365,10 +365,6 @@ export default function App() {
       router.replace("/", undefined, { shallow: true });
     }
   }, [router.query, router]);
-
-  useEffect(() => {
-    console.log("isSignUpMode:", isSignUpMode);
-  }, [isSignUpMode]);
 
   return (
     <>
@@ -401,48 +397,62 @@ export default function App() {
           paddingBottom: "clamp(1rem, 2vw, 2rem)",
         }}
       >
-        {/* User Nickname */}
-        {user && (
-          <div
-            className="text-center mb-4 transition-all duration-700 ease-out"
-            style={{
-              opacity: user ? 1 : 0,
-              transform: user ? "translateY(0)" : "translateY(-20px)",
-            }}
-          >
-            <span
-              className="tracking-tight"
+        {user ? (
+          <>
+            <div
+              className="text-center mb-4 transition-all duration-700 ease-out"
               style={{
-                fontFamily: "Georgia, 'Pretendard', sans-serif",
-                fontSize: "clamp(24px, 4vw, 48px)",
-                fontWeight: "bold",
-                lineHeight: "1",
+                opacity: user ? 1 : 0,
+                transform: user ? "translateY(0)" : "translateY(-20px)",
               }}
             >
-              {displayNameValue}'s
-            </span>
-          </div>
+              <span
+                className="tracking-tight"
+                style={{
+                  fontFamily: "Georgia, 'Pretendard', sans-serif",
+                  fontSize: "clamp(20px, 4vw, 40px)",
+                  fontWeight: "bold",
+                  lineHeight: "1",
+                }}
+              >
+                Linear Archive
+              </span>
+            </div>
+            <h1
+              className="text-center tracking-tight transition-all duration-700 ease-out"
+              style={{
+                fontFamily: "Georgia, sans-serif",
+                fontSize: "clamp(48px, 8vw, 90px)",
+                fontWeight: "bold",
+                lineHeight: "1",
+                transform: user ? "translateY(0)" : "translateY(40px)",
+                opacity: isSignUpMode ? 0 : 1,
+                visibility: isSignUpMode ? "hidden" : "visible",
+              }}
+            >
+              {displayNameValue}'s Line
+            </h1>
+          </>
+        ) : (
+          <h1
+            className="text-center tracking-tight transition-all duration-700 ease-out"
+            style={{
+              fontFamily: "Georgia, sans-serif",
+              fontSize: "clamp(48px, 8vw, 96px)",
+              fontWeight: "bold",
+              lineHeight: "1",
+              transform: user ? "translateY(0)" : "translateY(40px)",
+              opacity: isSignUpMode ? 0 : 1,
+              visibility: isSignUpMode ? "hidden" : "visible",
+            }}
+          >
+            Linear Archive
+          </h1>
         )}
-
-        {/* Linear Archive Title - 반응형 폰트 크기 */}
-        <h1
-          className="text-center tracking-tight transition-all duration-700 ease-out"
-          style={{
-            fontFamily: "Georgia, sans-serif",
-            fontSize: "clamp(48px, 8vw, 96px)",
-            fontWeight: "bold",
-            lineHeight: "1",
-            transform: user ? "translateY(0)" : "translateY(40px)",
-            opacity: isSignUpMode ? 0 : 1,
-            visibility: isSignUpMode ? "hidden" : "visible",
-          }}
-        >
-          Linear Archive
-        </h1>
 
         {/* Toolbar */}
         {user && (
-          <div className="flex justify-center mt-6 pointer-events-auto">
+          <div className="flex justify-center mt-8 pointer-events-auto">
             <Toolbar
               onNewArchive={handleToolbarNewArchive}
               onDateSelect={handleDateSelect}
@@ -456,7 +466,7 @@ export default function App() {
 
       {/* [수정됨] Main Content Background - 뷰포트 기반 높이 */}
       <div
-        className={`bg-[#F2F0EB] relative overflow-hidden flex flex-col transition-all duration-500 z-0 ${
+        className={`bg-[#F2F0EB] relative overflow-auto flex flex-col transition-all duration-500 z-0 ${
           !user ? "blur-[2px]" : "blur-0"
         }`}
         style={{
@@ -480,7 +490,7 @@ export default function App() {
 
         {/* Search Bar */}
         {isSearching && (
-          <div className="pb-8 pt-4">
+          <div className="pb-4 pt-4">
             <SearchBar
               onSearch={handleSearch}
               onClose={handleCloseSearch}
@@ -492,22 +502,26 @@ export default function App() {
         {/* Tags List */}
         <div
           className="flex justify-center overflow-hidden p-8 space-x-8"
-          style={{ marginTop: "3rem" }}
+          style={{ marginTop: "1rem" }}
         >
           {tags.map((tag, index) => {
-            const isSelected = selectedFilterTags.some(
-              (t) => t.name === tag.name && t.color === tag.color
-            );
+            const hasFilter = selectedFilterTags.length > 0;
+            const isSelected = hasFilter
+              ? selectedFilterTags.some(
+                  (t) => t.name === tag.name && t.color === tag.color
+                )
+              : false;
+            const buttonClass = hasFilter
+              ? isSelected
+                ? "border-black bg-white opacity-100 shadow-sm"
+                : "border-gray-300 bg-[#F2F0EB] opacity-50 hover:opacity-80"
+              : "border-gray-300 bg-[#F2F0EB] opacity-100 hover:border-black";
 
             return (
               <button
                 key={index}
                 onClick={() => handleTagClick(tag)}
-                className={`border px-2.5 py-1.5 flex items-center gap-1.5 transition-all shrink-0 ${
-                  isSelected
-                    ? "border-black bg-white opacity-100 shadow-sm"
-                    : "border-gray-300 bg-[#F2F0EB] opacity-60 hover:opacity-100"
-                }`}
+                className={`border px-2.5 py-1.5 flex items-center gap-1.5 transition-all shrink-0 ${buttonClass}`}
               >
                 <div
                   className="border border-black"
@@ -539,6 +553,7 @@ export default function App() {
             searchQuery={searchQuery}
             matchedNodeIds={matchedNodeIds}
             ref={timelineRef}
+            selectedFilterTags={selectedFilterTags}
           />
         </div>
       </div>

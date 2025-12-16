@@ -8,6 +8,7 @@ import {
   useMemo,
 } from "react";
 import { BoardWithTags } from "@/commons/libs/supabase/db";
+import { NodeTag } from "@/commons/types/types";
 
 interface TimelineProps {
   onNodeClick: (
@@ -18,6 +19,7 @@ interface TimelineProps {
   nodeDataMap: BoardWithTags[];
   searchQuery: string;
   matchedNodeIds: Set<number | string>;
+  selectedFilterTags?: NodeTag[];
 }
 
 export const Timeline = forwardRef<
@@ -25,7 +27,14 @@ export const Timeline = forwardRef<
   TimelineProps
 >(
   (
-    { onNodeClick, selectedNodeId, nodeDataMap, searchQuery, matchedNodeIds },
+    {
+      onNodeClick,
+      selectedNodeId,
+      nodeDataMap,
+      searchQuery,
+      matchedNodeIds,
+      selectedFilterTags,
+    },
     ref
   ) => {
     const [scrollPosition, setScrollPosition] = useState(0);
@@ -37,6 +46,34 @@ export const Timeline = forwardRef<
       null
     );
     const timelineRef = useRef<HTMLDivElement>(null);
+    const [nodeDisplayTags, setNodeDisplayTags] = useState<
+      Map<number | string, any>
+    >(new Map());
+    console.log("Timeline - 받아온 selectedFilterTags:", selectedFilterTags);
+
+    // useEffect로 검색어 변경 시 displayTag 계산
+    useEffect(() => {
+      if (!searchQuery.trim()) {
+        setNodeDisplayTags(new Map());
+        return;
+      }
+
+      const newDisplayTags = new Map();
+      const trimmedQuery = searchQuery.trim().toLowerCase();
+
+      nodeDataMap.forEach((nodeData) => {
+        if (matchedNodeIds.has(nodeData.board_id)) {
+          const matchingTag = nodeData.tags.find((t) =>
+            t.tag_name.toLowerCase().includes(trimmedQuery)
+          );
+          if (matchingTag) {
+            newDisplayTags.set(nodeData.board_id, matchingTag);
+          }
+        }
+      });
+
+      setNodeDisplayTags(newDisplayTags);
+    }, [searchQuery, matchedNodeIds, nodeDataMap]);
 
     const nodesById = useMemo(() => {
       if (!Array.isArray(nodeDataMap)) return new Map();
@@ -719,12 +756,45 @@ export const Timeline = forwardRef<
             {allNodes.map((node) => {
               const nodeData = nodesById.get(node.id);
               if (!nodeData) return null;
-              const nodeTag = nodeData.tags[0];
 
-              const isSearching = searchQuery.trim().length > 0;
+              const isSearching = matchedNodeIds.size > 0;
               const isMatched = matchedNodeIds.has(node.id);
               const shouldDim = isSearching && !isMatched;
               const shouldHighlight = isSearching && isMatched;
+
+              let displayTag = nodeData.tags[0];
+
+              if (isMatched) {
+                // 1) 태그 필터링이 활성화된 경우
+                if (selectedFilterTags.length > 0) {
+                  const matchingFilterTag = nodeData.tags.find((t) =>
+                    selectedFilterTags.some(
+                      (selectedTag) =>
+                        selectedTag.name === t.tag_name &&
+                        selectedTag.color === t.tag_color
+                    )
+                  );
+                  if (matchingFilterTag) {
+                    displayTag = matchingFilterTag;
+                  }
+                }
+                // 2) 검색어가 있는 경우
+                else if (searchQuery && searchQuery.trim().length > 0) {
+                  const trimmedQuery = searchQuery.trim().toLowerCase();
+
+                  // 정확한 일치 우선
+                  const exactMatch = nodeData.tags.find(
+                    (t) => t.tag_name.toLowerCase() === trimmedQuery
+                  );
+
+                  // 부분 일치
+                  const partialMatch = nodeData.tags.find((t) =>
+                    t.tag_name.toLowerCase().includes(trimmedQuery)
+                  );
+
+                  displayTag = exactMatch || partialMatch || displayTag;
+                }
+              }
 
               const clusterInfo = getNodeClusterInfo(node.id);
               const offset = clusterInfo
@@ -749,7 +819,7 @@ export const Timeline = forwardRef<
                     left: `${displayPosition}%`,
                     top: "50%",
                     transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))`,
-                    opacity: shouldDim ? 0.2 : 1,
+                    opacity: shouldDim ? 0.15 : 1,
                     transition: "all 0.3s ease",
                   }}
                   onClick={(e) => handleNodeClick(e, node)}
@@ -766,7 +836,7 @@ export const Timeline = forwardRef<
                     className="w-6 h-6 transition-all"
                     style={{
                       borderRadius: "50%",
-                      backgroundColor: nodeTag?.tag_color || "#F2F0EB",
+                      backgroundColor: displayTag.tag_color || "#F2F0EB",
                       border: shouldHighlight
                         ? "3px solid black"
                         : isSelected
@@ -792,8 +862,6 @@ export const Timeline = forwardRef<
             const nodeData = nodesById.get(hoveredNodeId);
 
             if (!node || !nodeData || !timelineRef.current) return null;
-
-            const nodeTag = nodeData.tags[0];
 
             // 날짜/시간은 문자열 기반으로 처리하여 타임존 보정에 영향을 받지 않도록 함
             const rawDate = nodeData.date as string | null;
@@ -880,20 +948,27 @@ export const Timeline = forwardRef<
                       )}
                     </div>
                   )}
-                  {nodeTag && (
-                    <div className="mb-1 flex items-center gap-1">
-                      <div
-                        style={{
-                          width: "8px",
-                          height: "8px",
-                          borderRadius: "50%",
-                          backgroundColor: nodeTag.tag_color,
-                          border: "1px solid black",
-                        }}
-                      />
-                      <span>{nodeTag.tag_name}</span>
-                    </div>
-                  )}
+                  <div className="mb-1 flex flex-row items-center gap-3">
+                    {nodeData.tags.map((tag) => {
+                      return (
+                        <div
+                          className="flex items-center gap-1"
+                          key={tag.tag_id}
+                        >
+                          <div
+                            style={{
+                              width: "8px",
+                              height: "8px",
+                              borderRadius: "50%",
+                              backgroundColor: tag.tag_color,
+                              border: "1px solid black",
+                            }}
+                          />
+                          <span>{tag.tag_name}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                   {nodeData.description && (
                     <div
                       className="mt-1 pt-1"
