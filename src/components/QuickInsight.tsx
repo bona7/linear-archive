@@ -36,9 +36,10 @@ export function QuickInsight({ insight }: QuickInsightProps) {
         opacity: isVisible && displayedInsight ? 1 : 0,
         transform: isVisible && displayedInsight ? "translateY(0)" : "translateY(10px)",
         minHeight: "60px", // Reserve space to prevent layout shift
+        marginTop: "-2rem", // Pull it up closer to the timeline
       }}
     >
-      <div className="max-w-2xl w-full flex items-start gap-3">
+      <div className="flex items-start gap-3" style={{ maxWidth: "800px" }}>
         <div className="flex-shrink-0 mt-0.5">
           <Sparkles size={16} strokeWidth={1.5} className="text-black" />
         </div>

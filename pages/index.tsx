@@ -561,7 +561,7 @@ export default function App() {
 
         {/* Tags List */}
         <div
-          className="flex justify-center overflow-hidden p-8 space-x-8"
+          className="flex justify-center overflow-hidden p-8 space-x-8 relative z-10"
           style={{ marginTop: "1rem" }}
         >
           {tags.map((tag, index) => {
@@ -605,7 +605,7 @@ export default function App() {
         </div>
 
         {/* Timeline Section */}
-        <div className="flex-1 flex flex-col items-center justify-center w-full">
+        <div className="flex-1 flex items-center justify-center w-full min-h-0">
           <Timeline
             onNodeClick={handleNodeClick}
             selectedNodeId={selectedNodeId}
@@ -615,10 +615,10 @@ export default function App() {
             ref={timelineRef}
             selectedFilterTags={selectedFilterTags}
           />
-
-          {/* Quick Insight - Below Timeline */}
-          {user && <QuickInsight insight={quickInsight} />}
         </div>
+
+        {/* Quick Insight - Below Timeline */}
+        {user && <QuickInsight insight={quickInsight} />}
       </div>
 
       {/* Modals & Menu (z-index는 컴포넌트 내부나 fixed로 제어됨) */}

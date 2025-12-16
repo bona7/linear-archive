@@ -99,6 +99,8 @@ export const fetchAnalysis = async (
 export interface QueryFilters {
   startDate: string | null;
   endDate: string | null;
+  startTime: string | null;
+  endTime: string | null;
   tags: string[];
   keywords: string[];
   daysOfWeek: number[] | null;
