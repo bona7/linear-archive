@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import { useState, useEffect } from "react";
-import { readBoardById, deleteBoard } from "../../commons/libs/supabase/db";
+import { readBoardById, deleteBoard } from "../commons/libs/supabase/db";
 import { NodeData, NodeTag } from "@/commons/types/types";
 
 interface ViewArchiveModalProps {

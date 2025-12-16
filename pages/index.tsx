@@ -1,13 +1,14 @@
-import { Timeline } from "@/design/components/Timeline";
-import { Toolbar } from "@/design/components/Toolbar";
-import { ArchiveModal } from "@/design/components/ArchiveModal";
-import { ViewArchiveModal } from "@/design/components/ViewArchiveModal";
-import { SearchBar } from "@/design/components/SearchBar";
-import { LoginModal } from "@/design/components/LoginModal";
-import { ProfileMenu } from "@/design/components/ProfileMenu";
+import { Timeline } from "@/components/Timeline";
+import { Toolbar } from "@/components/Toolbar";
+import { ArchiveModal } from "@/components/ArchiveModal";
+import { ViewArchiveModal } from "@/components/ViewArchiveModal";
+import { SearchBar } from "@/components/SearchBar";
+import { LoginModal } from "@/components/LoginModal";
+import { ProfileMenu } from "@/components/ProfileMenu";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { NodeData, NodeTag } from "@/commons/types/types";
 import { signOut, getSession } from "@/commons/libs/supabase/auth";
+import { AnalysisPanel } from "@/components/AnalysisPanel";
 import {
   BoardWithTags,
   Tag,
@@ -15,7 +16,6 @@ import {
   getCurrentUserTags,
 } from "@/commons/libs/supabase/db";
 import { useRouter } from "next/router";
-import { AnalysisPanel } from "@/design/components/AnalysisPanel";
 import {
   LoadingOverlay,
   LoadingIcon,

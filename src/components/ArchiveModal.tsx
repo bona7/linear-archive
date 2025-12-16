@@ -7,7 +7,7 @@ import {
   createBoard,
   updateBoard,
   readBoardById,
-} from "../../commons/libs/supabase/db";
+} from "../commons/libs/supabase/db";
 import { NodeData, NodeTag } from "@/commons/types/types";
 
 interface ArchiveModalProps {
