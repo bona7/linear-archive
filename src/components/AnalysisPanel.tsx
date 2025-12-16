@@ -206,17 +206,14 @@ export function AnalysisPanel({
     const stats: Statistics = calculateStatistics(boardsToAnalyze, tags);
     const highlights: StatHighlight[] = getRandomHighlights(stats);
 
-    console.log(highlights);
-
     try {
       // Pass isUserQuery flag to fetchAnalysis
       const data = await fetchAnalysis(boardsToAnalyze, stats, highlights, hasUserQuery);
       if (data) {
-        setAnalysisData(data);
+        setAnalysisData({ analysis: data });
       }
     } catch (error) {
       console.error("Failed to get analysis:", error);
-      // Optionally, set an error state to show in the UI
     } finally {
       setIsLoading(false);
     }

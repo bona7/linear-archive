@@ -13,7 +13,7 @@ import { NodeData, NodeTag } from "@/commons/types/types";
 interface ArchiveModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (date: Date | null) => void;
+  onSave: (date: Date | null, savedBoard?: any) => void;
   onDelete: () => void;
   position?: { x: number; y: number } | null;
   currentNodeData?: NodeData;
@@ -264,6 +264,8 @@ export function ArchiveModal({
         tag_color: tag.color,
       }));
 
+      let resultBoard;
+
       if (currentNodeData) {
         // 기존 아카이브 수정
         const result = await updateBoard(currentNodeData.id, {
@@ -273,6 +275,7 @@ export function ArchiveModal({
           tags: tags,
           image: selectedImageFile || undefined,
         });
+        resultBoard = result;
 
         console.log("아카이브 수정 완료:", {
           id: currentNodeData.id,
@@ -292,6 +295,7 @@ export function ArchiveModal({
           tags: tags,
           image: selectedImageFile || undefined,
         });
+        resultBoard = result;
 
         console.log("아카이브 생성 완료:", {
           description: description || undefined,
@@ -312,7 +316,12 @@ export function ArchiveModal({
         selectedHour,
         selectedMinute
       );
-      onSave(date);
+      
+      console.log("ArchiveModal: Calling onSave with board:", resultBoard);
+      console.log("ArchiveModal: Board Description:", resultBoard?.description);
+      console.log("ArchiveModal: Board Tags:", resultBoard?.tags);
+      
+      onSave(date, resultBoard);
 
       // 모달 닫기
       onClose();

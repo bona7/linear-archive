@@ -24,50 +24,33 @@ export const fetchAnalysis = async (
     const analysisData = await getUserAnalysis();
     const history = analysisData?.compressed_data || "";
     const boardsSinceCompression = analysisData?.boards_since_last_compression ?? 0;
-    
-    console.log("=== RAG Analysis Data Fetched ===");
-    console.log("Total Boards Available:", boards.length);
-    console.log("User History Length:", history?.length || 0);
-    console.log("Boards Since Last Compression:", boardsSinceCompression);
-    console.log("Is User Query:", isUserQuery);
 
     // For GENERAL ANALYSIS (분석/재분석): Only send boards since last compression
     // For USER QUERY: boards are already filtered by RAG logic in AnalysisPanel
     let boardsToSend = boards;
-    
+
     if (!isUserQuery) {
       if (boardsSinceCompression > 0) {
         // Send only the most recent N boards where N = boards_since_last_compression
         // Boards are already sorted by date descending in readBoardsWithTags
         boardsToSend = boards.slice(0, boardsSinceCompression);
-        
-        console.log("Boards to analyze (since last compression):", boardsToSend.length);
-        console.log("Boards sample (first 3):", boardsToSend.slice(0, 3));
       } else {
         // Counter is 0: Either first-time analysis or all boards already compressed
         // For first-time analysis, analyze all boards
         // For subsequent analyses after compression, there are no new boards
         if (boards.length > 0 && !history) {
           // First-time analysis: no history exists, analyze all boards
-          console.log("First-time analysis: analyzing all", boards.length, "boards");
           boardsToSend = boards;
         } else {
           // All boards already compressed, no new boards to analyze
-          console.log("No new boards since last compression");
           return null;
         }
       }
-    } else {
-      console.log("Using filtered boards from RAG:", boardsToSend.length);
     }
 
     if (boardsToSend.length === 0) {
-      console.log("No boards to analyze");
       return null;
     }
-
-    console.log("Statistics:", statistics);
-    console.log("Random Metrics:", randomMetrics);
 
     // Build payload conditionally
     // For USER QUERY RAG: Only send boards and history (no stats/metrics)
@@ -82,13 +65,6 @@ export const fetchAnalysis = async (
       payload.statistics = statistics;
       payload.metrics = randomMetrics;
     }
-
-    console.log("Sending to Analysis API:");
-    console.log("  - Boards:", boardsToSend.length, "items");
-    console.log("  - Metrics included:", !isUserQuery);
-    console.log("  - Statistics included:", !isUserQuery);
-    console.log("  - History included:", !!history);
-    console.log("Full Payload:", JSON.stringify(payload, null, 2));
 
     const response = await fetch(
       "https://4iy42lphh8.execute-api.ap-northeast-2.amazonaws.com/dev/deepseek/analysis",
@@ -107,13 +83,10 @@ export const fetchAnalysis = async (
     }
 
     const data = await response.json();
-    console.log("Analysis API response (raw):", data);
 
     // Parse the body if it's a string
     const parsedData =
       typeof data.body === "string" ? JSON.parse(data.body) : data;
-    console.log("Analysis API response (parsed):", parsedData);
-    console.log("Analysis details:", parsedData.analysis);
 
     // Return the analysis data
     return parsedData.analysis;
@@ -126,6 +99,8 @@ export const fetchAnalysis = async (
 export interface QueryFilters {
   startDate: string | null;
   endDate: string | null;
+  startTime: string | null;
+  endTime: string | null;
   tags: string[];
   keywords: string[];
   daysOfWeek: number[] | null;
@@ -206,10 +181,8 @@ export const fetchSemanticSearchBoards = async (query: string): Promise<string[]
     const data = await response.json();
     // Lambda wrapper might return 'body' as string
     const parsed = typeof data.body === "string" ? JSON.parse(data.body) : data;
-    
-    console.log("Vector Search Results:", parsed);
 
-    if (parsed.boards) {        
+    if (parsed.boards) {
         return parsed.boards.map((b: any) => b.board_id);
     }
     return [];
@@ -250,11 +223,96 @@ export const triggerDataCompression = async (boards: any[], userId: string): Pro
     }
 
     const data = await response.json();
-    console.log("Data Compression Triggered:", data);
     return data;
 
   } catch (error) {
       console.error("Compression trigger failed:", error);
       return null;
+  }
+}
+
+export const fetchQuickInsight = async (
+  boards: BoardWithTags[],
+  statistics: Statistics,
+  action: "create" | "update" | "delete" = "create",
+  targetBoardId?: string,
+  explicitTargetBoard?: BoardWithTags
+): Promise<string | null> => {
+  try {
+    const session = await getSession();
+    if (!session?.access_token) {
+      return null;
+    }
+
+    // Determine target board: use explicit if provided, otherwise find by ID
+    let targetBoard = explicitTargetBoard || boards.find(b => b.board_id === targetBoardId) || boards[0];
+
+    if (!targetBoard) {
+      console.error("No target board available");
+      return null;
+    }
+
+    // Fetch user's compressed history
+    const analysisData = await getUserAnalysis();
+    const history = analysisData?.compressed_data || "";
+
+    // Extract simple stats
+    const stats = {
+      mostActiveDay: statistics.habits?.mostActiveDay || "N/A",
+      currentStreak: statistics.habits?.currentStreak || 0,
+      totalBoards: statistics.counts?.totalBoards || 0,
+    };
+
+    // RAG: Find similar boards for pattern detection
+    let relatedBoards: BoardWithTags[] = [];
+    if (targetBoard.description || targetBoard.tags.length > 0) {
+      const searchQuery = [
+        targetBoard.description,
+        ...targetBoard.tags.map(t => t.tag_name)
+      ].filter(Boolean).join(" ");
+
+      if (searchQuery.trim()) {
+        const similarBoardIds = await fetchSemanticSearchBoards(searchQuery);
+        if (similarBoardIds && similarBoardIds.length > 0) {
+          relatedBoards = boards
+            .filter(b => similarBoardIds.includes(b.board_id) && b.board_id !== targetBoard?.board_id)
+            .slice(0, 5);
+        }
+      }
+    }
+
+    const payload = {
+      task: "quick_insight",
+      target_board: targetBoard,
+      related_boards: relatedBoards,
+      stats: stats,
+      history: history,
+      action: action,
+    };
+
+    const response = await fetch(
+      "https://4iy42lphh8.execute-api.ap-northeast-2.amazonaws.com/dev/deepseek/analysis",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!response.ok) {
+      console.error(`Quick Insight API error: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    const parsedData = typeof data.body === "string" ? JSON.parse(data.body) : data;
+
+    return parsedData.insight || null;
+  } catch (error) {
+    console.error("Quick insight failed:", error);
+    return null;
   }
 }
