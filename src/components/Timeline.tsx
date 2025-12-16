@@ -49,7 +49,12 @@ export const Timeline = forwardRef<
     const [nodeDisplayTags, setNodeDisplayTags] = useState<
       Map<number | string, any>
     >(new Map());
-    console.log("Timeline - 받아온 selectedFilterTags:", selectedFilterTags);
+    // console.log("Timeline - 받아온 selectedFilterTags:", selectedFilterTags);
+
+    // 줌 상태 변경 시 콘솔에 출력
+    useEffect(() => {
+      console.log(`[Timeline] Zoom level: ${zoom.toFixed(2)}`);
+    }, [zoom]);
 
     // useEffect로 검색어 변경 시 displayTag 계산
     useEffect(() => {
@@ -292,9 +297,9 @@ export const Timeline = forwardRef<
     const clusterNodes = (nodes: typeof allNodes) => {
       if (nodes.length === 0) return [];
 
-      // ✅ 충분히 확대되었을 때(zoom ≥ 3.0)는
+      // ✅ 충분히 확대되었을 때(zoom ≥ 2.0)는
       // 같은 날짜(YYYY-MM-DD)끼리 묶어서 동심원 클러스터를 만든다
-      if (zoom >= 3.0) {
+      if (zoom >= 2.0) {
         const clusters: Array<{
           id: number;
           centerPosition: number;
@@ -338,52 +343,309 @@ export const Timeline = forwardRef<
         return clusters;
       }
 
-      // ⬇️ zoom < 3.0 에서는 기존 버킷(기간) 기반 클러스터링 유지
+      // ⬇️ zoom < 2.0 에서는 줌 레벨에 따라 연도, 월, 주 단위로 제한
       const bucketCount = getPeriodBucketCount(zoom);
-      const bucketWidth = 100 / bucketCount;
-
-      const buckets: Array<{
+      const allClusters: Array<{
         id: number;
         centerPosition: number;
         nodes: typeof allNodes;
       }> = [];
 
-      for (let i = 0; i < bucketCount; i++) {
-        buckets.push({
-          id: i,
-          centerPosition: 0,
-          nodes: [],
+      let globalClusterId = 0;
+
+      // 주 번호를 계산하는 헬퍼 함수
+      const getWeekNumber = (date: Date): string => {
+        const d = new Date(
+          Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+        );
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        const weekNo = Math.ceil(
+          ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7
+        );
+        return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+      };
+
+      // zoom >= 1.0 && zoom < 2.0: 주 단위로 제한
+      if (zoom >= 1.0 && zoom < 2.0) {
+        // 연도-주별로 노드 그룹화
+        const weekGroups = new Map<string, typeof allNodes>();
+
+        nodes.forEach((node) => {
+          const nodeData = nodesById.get(node.id);
+          if (!nodeData || !nodeData.date) return;
+
+          const dateObj = new Date(nodeData.date);
+          const weekKey = getWeekNumber(dateObj);
+
+          const arr = weekGroups.get(weekKey);
+          if (arr) arr.push(node);
+          else weekGroups.set(weekKey, [node]);
+        });
+
+        // 각 주 그룹 내에서 버킷 클러스터링 수행
+        weekGroups.forEach((weekNodes, weekKey) => {
+          if (weekNodes.length === 0) return;
+
+          // 해당 주의 노드들만으로 position 범위 계산
+          const weekPositions = weekNodes.map((n) => n.position);
+          const minPos = Math.min(...weekPositions);
+          const maxPos = Math.max(...weekPositions);
+          const weekRange = maxPos - minPos;
+
+          if (weekRange === 0) {
+            // 같은 위치의 노드들 (같은 날짜)
+            allClusters.push({
+              id: globalClusterId++,
+              centerPosition: minPos,
+              nodes: weekNodes,
+            });
+            return;
+          }
+
+          // 해당 주 내에서만 버킷 생성 (주 범위에 비례하여 버킷 수 조정, 더 촘촘하게)
+          const weekBucketCount = Math.max(
+            1,
+            Math.floor(bucketCount * (weekRange / 100) * 2) // 2배로 증가하여 더 촘촘하게
+          );
+          const weekBucketWidth = weekRange / weekBucketCount;
+
+          const buckets: Array<{
+            id: number;
+            centerPosition: number;
+            nodes: typeof allNodes;
+          }> = [];
+
+          for (let i = 0; i < weekBucketCount; i++) {
+            buckets.push({
+              id: i,
+              centerPosition: 0,
+              nodes: [],
+            });
+          }
+
+          // 해당 주의 노드들을 주 내 버킷에 할당
+          weekNodes.forEach((node) => {
+            const relativePos = node.position - minPos;
+            const rawIndex = Math.floor(relativePos / weekBucketWidth);
+            const bucketIndex = Math.min(
+              weekBucketCount - 1,
+              Math.max(0, rawIndex)
+            );
+            buckets[bucketIndex].nodes.push(node);
+          });
+
+          // 각 버킷을 클러스터로 변환
+          buckets.forEach((bucket) => {
+            if (bucket.nodes.length === 0) return;
+
+            // 클러스터의 중심은 해당 주 내 노드들의 평균 위치
+            const centerPos =
+              bucket.nodes.reduce((sum, n) => sum + n.position, 0) /
+              bucket.nodes.length;
+
+            // 주 경계를 벗어나지 않도록 제한
+            const clampedCenterPos = Math.max(
+              minPos,
+              Math.min(maxPos, centerPos)
+            );
+
+            allClusters.push({
+              id: globalClusterId++,
+              centerPosition: clampedCenterPos,
+              nodes: bucket.nodes,
+            });
+          });
+        });
+      }
+      // zoom >= 0.5 && zoom < 1.0: 월 단위로 제한
+      else if (zoom >= 0.5 && zoom < 1.0) {
+        // 연도-월별로 노드 그룹화
+        const monthGroups = new Map<string, typeof allNodes>();
+
+        nodes.forEach((node) => {
+          const nodeData = nodesById.get(node.id);
+          if (!nodeData || !nodeData.date) return;
+
+          const dateObj = new Date(nodeData.date);
+          const year = dateObj.getFullYear();
+          const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+          const monthKey = `${year}-${month}`;
+
+          const arr = monthGroups.get(monthKey);
+          if (arr) arr.push(node);
+          else monthGroups.set(monthKey, [node]);
+        });
+
+        // 각 월 그룹 내에서 버킷 클러스터링 수행
+        monthGroups.forEach((monthNodes, monthKey) => {
+          if (monthNodes.length === 0) return;
+
+          // 해당 월의 노드들만으로 position 범위 계산
+          const monthPositions = monthNodes.map((n) => n.position);
+          const minPos = Math.min(...monthPositions);
+          const maxPos = Math.max(...monthPositions);
+          const monthRange = maxPos - minPos;
+
+          if (monthRange === 0) {
+            // 같은 위치의 노드들 (같은 날짜)
+            allClusters.push({
+              id: globalClusterId++,
+              centerPosition: minPos,
+              nodes: monthNodes,
+            });
+            return;
+          }
+
+          // 해당 월 내에서만 버킷 생성 (월 범위에 비례하여 버킷 수 조정, 더 촘촘하게)
+          const monthBucketCount = Math.max(
+            1,
+            Math.floor(bucketCount * (monthRange / 100) * 2) // 2배로 증가하여 더 촘촘하게
+          );
+          const monthBucketWidth = monthRange / monthBucketCount;
+
+          const buckets: Array<{
+            id: number;
+            centerPosition: number;
+            nodes: typeof allNodes;
+          }> = [];
+
+          for (let i = 0; i < monthBucketCount; i++) {
+            buckets.push({
+              id: i,
+              centerPosition: 0,
+              nodes: [],
+            });
+          }
+
+          // 해당 월의 노드들을 월 내 버킷에 할당
+          monthNodes.forEach((node) => {
+            const relativePos = node.position - minPos;
+            const rawIndex = Math.floor(relativePos / monthBucketWidth);
+            const bucketIndex = Math.min(
+              monthBucketCount - 1,
+              Math.max(0, rawIndex)
+            );
+            buckets[bucketIndex].nodes.push(node);
+          });
+
+          // 각 버킷을 클러스터로 변환
+          buckets.forEach((bucket) => {
+            if (bucket.nodes.length === 0) return;
+
+            // 클러스터의 중심은 해당 월 내 노드들의 평균 위치
+            const centerPos =
+              bucket.nodes.reduce((sum, n) => sum + n.position, 0) /
+              bucket.nodes.length;
+
+            // 월 경계를 벗어나지 않도록 제한
+            const clampedCenterPos = Math.max(
+              minPos,
+              Math.min(maxPos, centerPos)
+            );
+
+            allClusters.push({
+              id: globalClusterId++,
+              centerPosition: clampedCenterPos,
+              nodes: bucket.nodes,
+            });
+          });
+        });
+      } else {
+        // zoom < 0.5: 연도 단위로 제한
+        // 연도별로 노드 그룹화
+        const yearGroups = new Map<number, typeof allNodes>();
+
+        nodes.forEach((node) => {
+          const nodeData = nodesById.get(node.id);
+          if (!nodeData || !nodeData.date) return;
+
+          const dateObj = new Date(nodeData.date);
+          const year = dateObj.getFullYear();
+
+          const arr = yearGroups.get(year);
+          if (arr) arr.push(node);
+          else yearGroups.set(year, [node]);
+        });
+
+        // 각 연도 그룹 내에서 버킷 클러스터링 수행
+        yearGroups.forEach((yearNodes, year) => {
+          if (yearNodes.length === 0) return;
+
+          // 해당 연도의 노드들만으로 position 범위 계산
+          const yearPositions = yearNodes.map((n) => n.position);
+          const minPos = Math.min(...yearPositions);
+          const maxPos = Math.max(...yearPositions);
+          const yearRange = maxPos - minPos;
+
+          if (yearRange === 0) {
+            // 같은 위치의 노드들 (같은 날짜)
+            allClusters.push({
+              id: globalClusterId++,
+              centerPosition: minPos,
+              nodes: yearNodes,
+            });
+            return;
+          }
+
+          // 해당 연도 내에서만 버킷 생성 (연도 범위에 비례하여 버킷 수 조정)
+          const yearBucketCount = Math.max(
+            1,
+            Math.floor(bucketCount * (yearRange / 100))
+          );
+          const yearBucketWidth = yearRange / yearBucketCount;
+
+          const buckets: Array<{
+            id: number;
+            centerPosition: number;
+            nodes: typeof allNodes;
+          }> = [];
+
+          for (let i = 0; i < yearBucketCount; i++) {
+            buckets.push({
+              id: i,
+              centerPosition: 0,
+              nodes: [],
+            });
+          }
+
+          // 해당 연도의 노드들을 연도 내 버킷에 할당
+          yearNodes.forEach((node) => {
+            const relativePos = node.position - minPos;
+            const rawIndex = Math.floor(relativePos / yearBucketWidth);
+            const bucketIndex = Math.min(
+              yearBucketCount - 1,
+              Math.max(0, rawIndex)
+            );
+            buckets[bucketIndex].nodes.push(node);
+          });
+
+          // 각 버킷을 클러스터로 변환
+          buckets.forEach((bucket) => {
+            if (bucket.nodes.length === 0) return;
+
+            // 클러스터의 중심은 해당 연도 내 노드들의 평균 위치
+            const centerPos =
+              bucket.nodes.reduce((sum, n) => sum + n.position, 0) /
+              bucket.nodes.length;
+
+            // 연도 경계를 벗어나지 않도록 제한
+            const clampedCenterPos = Math.max(
+              minPos,
+              Math.min(maxPos, centerPos)
+            );
+
+            allClusters.push({
+              id: globalClusterId++,
+              centerPosition: clampedCenterPos,
+              nodes: bucket.nodes,
+            });
+          });
         });
       }
 
-      // 각 노드를 0~100% 구간 기준으로 버킷에 할당
-      nodes.forEach((node) => {
-        const rawIndex = Math.floor(node.position / bucketWidth);
-        const bucketIndex = Math.min(bucketCount - 1, Math.max(0, rawIndex));
-        buckets[bucketIndex].nodes.push(node);
-      });
-
-      const clusters: Array<{
-        id: number;
-        centerPosition: number;
-        nodes: typeof allNodes;
-      }> = [];
-
-      buckets.forEach((bucket) => {
-        if (bucket.nodes.length === 0) return;
-
-        const centerPos =
-          bucket.nodes.reduce((sum, n) => sum + n.position, 0) /
-          bucket.nodes.length;
-
-        clusters.push({
-          id: bucket.id,
-          centerPosition: centerPos,
-          nodes: bucket.nodes,
-        });
-      });
-
-      return clusters;
+      return allClusters;
     };
 
     const clusters = clusterNodes(allNodes);
