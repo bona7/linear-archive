@@ -66,8 +66,8 @@ export function ArchiveModal({
   // 연도 배열: 1950년부터 현재 연도까지 (최신 연도부터 표시)
   const currentYear = new Date().getFullYear();
   const years = Array.from(
-    { length: currentYear - 1950 + 1 },
-    (_, i) => 1950 + i
+    { length: currentYear - 2015 + 1 },
+    (_, i) => 2015 + i
   ).reverse();
 
   const daysOfWeek = ["월", "화", "수", "목", "금", "토", "일"];
