@@ -17,24 +17,18 @@ export function TagCreator({
   onCreateTag,
 }: TagCreatorProps) {
   const [tagName, setTagName] = useState<string>("");
-  const [selectedColor, setSelectedColor] = useState<string>("#FF69B4");
+  const [selectedColor, setSelectedColor] = useState<string>("#C43726");
   const [showColorPicker, setShowColorPicker] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const defaultColors = [
-    "#FF69B4", // Pink
-    "#FF6B8A", // Light Red
-    "#8B7FFF", // Purple
-    "#FFD700", // Gold
-    "#C0C0C0", // Silver
-    "#9370DB", // Medium Purple
-    "#3B82F6", // Blue
-    "#EF4444", // Red
-    "#10B981", // Green
-    "#F59E0B", // Amber
-    "#8B4789", // Dark Purple
-    "#B8860B", // Dark Goldenrod
+    "#C43726",
+    "#C6A15B", // Ochre
+    "#2C573D", // Sage
+    "#A26769", // Brown
+    "#4F6D7A", // Mauve
+    "#102937",
   ];
 
   // 모달이 열릴 때 입력창에 포커스
@@ -48,7 +42,7 @@ export function TagCreator({
   useEffect(() => {
     if (!isOpen) {
       setTagName("");
-      setSelectedColor("#FF69B4");
+      setSelectedColor("#C43726");
       setShowColorPicker(false);
     }
   }, [isOpen]);

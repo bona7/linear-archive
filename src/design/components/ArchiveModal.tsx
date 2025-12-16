@@ -27,8 +27,8 @@ export function ArchiveModal({
   position,
   currentNodeData,
 }: ArchiveModalProps) {
-  const [selectedYear, setSelectedYear] = useState<number>(2025);
-  const [selectedMonth, setSelectedMonth] = useState<number>(10); // November (0-indexed)
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [selectedHour, setSelectedHour] = useState<number>(0);
   const [selectedMinute, setSelectedMinute] = useState<number>(0);
@@ -128,14 +128,15 @@ export function ArchiveModal({
     const loadBoardData = async () => {
       if (!isOpen) return;
 
-      // 수정 모드가 아니면 초기값 설정
+      // 수정 모드가 아니면 초기값 오늘로 설정
       if (!currentNodeData?.id) {
+        const today = new Date();
+        setSelectedYear(today.getFullYear());
+        setSelectedMonth(today.getMonth());
+        setSelectedDay(today.getDate());
         setSelectedTags([]);
         setDescription("");
         setErrorMessage(null);
-        setSelectedYear(2025);
-        setSelectedMonth(10);
-        setSelectedDay(null);
         setSelectedHour(0);
         setSelectedMinute(0);
         setSelectedImage(null);
