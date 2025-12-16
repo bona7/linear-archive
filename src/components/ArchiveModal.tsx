@@ -66,7 +66,7 @@ export function ArchiveModal({
   // 연도 배열: 1950년부터 현재 연도까지 (최신 연도부터 표시)
   const currentYear = new Date().getFullYear();
   const years = Array.from(
-    { length: currentYear - 2015 + 1 },
+    { length: currentYear - 2015 + 1 }, // 과제전 때까지 2015년
     (_, i) => 2015 + i
   ).reverse();
 

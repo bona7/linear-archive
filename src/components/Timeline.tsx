@@ -526,9 +526,20 @@ export const Timeline = forwardRef<
       }
 
       const visibleDays = getVisibleDays();
+
       let monthStep = 1;
-      if (visibleDays > 3000) monthStep = 12;
-      else if (visibleDays > 1800) monthStep = 3;
+      let yearStep = 1; // 기본적으로 매년 표시해요
+      if (visibleDays > 365 * 100) { 
+        yearStep = 10; // 100년 이상 보이면 10년 단위
+        monthStep = 12; 
+      } else if (visibleDays > 365 * 50) { 
+        yearStep = 5;  // 50년 이상 보이면 5년 단위
+        monthStep = 12;
+      } else if (visibleDays > 365 * 10) {
+        monthStep = 12; // 10년 이상이면 월은 숨기고 연도(1년 단위)만
+      } else if (visibleDays > 365 * 6) {
+        monthStep = 3;
+      }
 
       while (currentDate <= endDate) {
         const daysSinceStart =
@@ -537,10 +548,15 @@ export const Timeline = forwardRef<
         const month = currentDate.getMonth() + 1;
         const year = currentDate.getFullYear();
         const isJanuary = month === 1;
-        const shouldShowMonth = (month - 1) % monthStep === 0;
+
+        let shouldShow = (month - 1) % monthStep === 0; // 변수로 변경
+
+        if (isJanuary) { // 1월 표시선 == 년도 표시선인 경우를 체크
+            shouldShow = year % yearStep === 0;
+        }
 
         if (position >= 0 && position <= 100) {
-          if (shouldShowMonth) {
+          if (shouldShow) {
             markers.push({
               position,
               label: isJanuary ? `${year}년` : `${month}월`,
