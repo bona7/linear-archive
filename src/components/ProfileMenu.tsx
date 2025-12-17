@@ -1,16 +1,23 @@
 import { Settings, LogOut, User } from "lucide-react";
 import { useState } from "react";
 import { Router, useRouter } from "next/router";
+import { SettingsModal } from "./SettingsModal"; // Import the new SettingsModal
 
 interface ProfileMenuProps {
   onLogout: () => void;
   userNickname: string;
+  onUpdateNickname: (newNickname: string) => void; // Add onUpdateNickname prop
 }
 
-export function ProfileMenu({ onLogout, userNickname }: ProfileMenuProps) {
+export function ProfileMenu({
+  onLogout,
+  userNickname,
+  onUpdateNickname,
+}: ProfileMenuProps) {
   const router = useRouter();
 
   const [isOpen, setIsOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false); // New state for settings modal
 
   return (
     <div className="fixed top-8 right-8 z-50">
@@ -54,9 +61,8 @@ export function ProfileMenu({ onLogout, userNickname }: ProfileMenuProps) {
             <button
               className="w-full flex items-center gap-3 px-4 py-3 border-b border-black hover:bg-black hover:text-[#F2F0EB] transition-colors"
               onClick={() => {
-                // Settings action here
-                console.log("Settings clicked");
-                setIsOpen(false);
+                setIsSettingsModalOpen(true); // Open settings modal
+                setIsOpen(false); // Close profile dropdown
               }}
             >
               <Settings
@@ -101,6 +107,16 @@ export function ProfileMenu({ onLogout, userNickname }: ProfileMenuProps) {
             </button>
           </div>
         </>
+      )}
+
+      {/* Render SettingsModal */}
+      {isSettingsModalOpen && (
+        <SettingsModal
+          isOpen={isSettingsModalOpen}
+          onClose={() => setIsSettingsModalOpen(false)}
+          onSave={onUpdateNickname} // Pass the onUpdateNickname callback
+          userNickname={userNickname}
+        />
       )}
     </div>
   );

@@ -8,7 +8,11 @@ import { ProfileMenu } from "@/components/ProfileMenu";
 import { QuickInsight } from "@/components/QuickInsight";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { NodeData, NodeTag } from "@/commons/types/types";
-import { signOut, getSession } from "@/commons/libs/supabase/auth";
+import {
+  signOut,
+  getSession,
+  updateDisplayName,
+} from "@/commons/libs/supabase/auth";
 import { AnalysisPanel } from "@/components/AnalysisPanel";
 import {
   BoardWithTags,
@@ -185,6 +189,16 @@ export default function App() {
     setIsSignUpMode(false); // 로그인된 상태에서는 회원가입 모드 해제
   }, [user]);
 
+  const handleUpdateDisplayName = async (newDisplayName: string) => {
+    try {
+      console.log("index.tsx - handleUpdateDisplayName called");
+      await updateDisplayName(newDisplayName);
+      setDisplayNameValue(newDisplayName);
+    } catch (error) {
+      console.error("Failed to update display name:", error);
+    }
+  };
+
   // Function to refresh quick insight
   const refreshQuickInsight = async () => {
     if (!user || boards.length === 0) {
@@ -279,24 +293,26 @@ export default function App() {
 
         // Fallback logic...
         if (!boardToAnalyze) {
-             if (targetBoardId) {
-                 boardToAnalyze = updatedBoards.find(b => b.board_id === targetBoardId);
-             } else if (updatedBoards.length > 0) {
-                 const sortedByCreatedAt = [...updatedBoards].sort((a, b) => {
-                    const aTime = new Date(a.created_at || 0).getTime();
-                    const bTime = new Date(b.created_at || 0).getTime();
-                    return bTime - aTime;
-                  });
-                 boardToAnalyze = sortedByCreatedAt[0];
-             }
+          if (targetBoardId) {
+            boardToAnalyze = updatedBoards.find(
+              (b) => b.board_id === targetBoardId
+            );
+          } else if (updatedBoards.length > 0) {
+            const sortedByCreatedAt = [...updatedBoards].sort((a, b) => {
+              const aTime = new Date(a.created_at || 0).getTime();
+              const bTime = new Date(b.created_at || 0).getTime();
+              return bTime - aTime;
+            });
+            boardToAnalyze = sortedByCreatedAt[0];
+          }
         }
 
         const insight = await fetchQuickInsight(
-            updatedBoards,
-            statistics,
-            action,
-            boardToAnalyze?.board_id,
-            boardToAnalyze
+          updatedBoards,
+          statistics,
+          action,
+          boardToAnalyze?.board_id,
+          boardToAnalyze
         );
         setQuickInsight(insight);
       } catch (error) {
@@ -550,7 +566,7 @@ export default function App() {
 
         {/* Search Bar */}
         {isSearching && (
-          <div className="pb-4 pt-4">
+          <div className="pb-8 pt-4">
             <SearchBar
               onSearch={handleSearch}
               onClose={handleCloseSearch}
@@ -561,7 +577,7 @@ export default function App() {
 
         {/* Tags List */}
         <div
-          className="flex justify-center overflow-hidden p-8 space-x-8 relative z-10"
+          className="flex justify-center overflow-auto p-8 space-x-8 relative z-10 tags-scrollbar"
           style={{ marginTop: "1rem" }}
         >
           {tags.map((tag, index) => {
@@ -624,7 +640,11 @@ export default function App() {
       {/* Modals & Menu (z-index는 컴포넌트 내부나 fixed로 제어됨) */}
 
       {user && (
-        <ProfileMenu onLogout={handleLogout} userNickname={displayNameValue} />
+        <ProfileMenu
+          onLogout={handleLogout}
+          onUpdateNickname={handleUpdateDisplayName}
+          userNickname={displayNameValue}
+        />
       )}
 
       {(() => {

@@ -32,33 +32,40 @@ a {
   box-sizing: border-box;
 }
 
-/* Timeline scrollbar - hidden by default, shown on hover */
-.timeline-container {
+/* Timeline & Tags scrollbar - hidden by default, shown on hover */
+.timeline-container,
+.tags-scrollbar {
   scrollbar-width: thin; /* Firefox */
   scrollbar-color: transparent transparent; /* Firefox - transparent scrollbar */
 }
 
-.timeline-container::-webkit-scrollbar {
+.timeline-container::-webkit-scrollbar,
+.tags-scrollbar::-webkit-scrollbar {
   height: 8px; /* Chrome, Safari, Edge */
 }
 
-.timeline-container::-webkit-scrollbar-track {
+.timeline-container::-webkit-scrollbar-track,
+.tags-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.timeline-container::-webkit-scrollbar-thumb {
+.timeline-container::-webkit-scrollbar-thumb,
+.tags-scrollbar::-webkit-scrollbar-thumb {
   background-color: transparent;
 }
 
-.timeline-container:hover {
-  scrollbar-color: #000000 #f2f0eb; /* Firefox - black scrollbar on hover */
+.timeline-container:hover,
+.tags-scrollbar:hover {
+  scrollbar-color: #000000 transparent; /* Firefox - black scrollbar on hover */
 }
 
-.timeline-container:hover::-webkit-scrollbar-track {
-  background: #f2f0eb;
+.timeline-container:hover::-webkit-scrollbar-track,
+.tags-scrollbar:hover::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.timeline-container:hover::-webkit-scrollbar-thumb {
+.timeline-container:hover::-webkit-scrollbar-thumb,
+.tags-scrollbar:hover::-webkit-scrollbar-thumb {
   background-color: #000000;
   border: 1px solid #f2f0eb;
 }
