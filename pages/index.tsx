@@ -566,7 +566,7 @@ export default function App() {
 
         {/* Search Bar */}
         {isSearching && (
-          <div className="pb-4 pt-4">
+          <div className="pb-8 pt-4">
             <SearchBar
               onSearch={handleSearch}
               onClose={handleCloseSearch}
@@ -577,7 +577,7 @@ export default function App() {
 
         {/* Tags List */}
         <div
-          className="flex justify-center overflow-hidden p-8 space-x-8 relative z-10"
+          className="flex justify-center overflow-auto p-8 space-x-8 relative z-10 tags-scrollbar"
           style={{ marginTop: "1rem" }}
         >
           {tags.map((tag, index) => {
