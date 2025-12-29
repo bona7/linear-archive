@@ -268,63 +268,71 @@ export default function App() {
   };
 
   const handleSaveArchive = async (date: Date | null, savedBoard?: any) => {
-    if (user) {
-      try {
-        // Determine if this is a create or update
-        const isUpdate = selectedNodeId !== null;
-        const targetBoardId = selectedNodeId;
+    if (!user) return;
 
-        const updatedBoards = await readBoardsWithTags();
-
-        const updatedTags = await getCurrentUserTags();
-        const newNodeTags: NodeTag[] = updatedTags.map((tag) => ({
-          name: tag.tag_name,
-          color: tag.tag_color,
-        }));
-        setTags(newNodeTags);
-        setBoards(updatedBoards);
-
-        // Trigger quick insight after saving a board
-        const statistics = calculateStatistics(updatedBoards, updatedTags);
-        const action = isUpdate ? "update" : "create";
-
-        // Use the explicitly passed board object from ArchiveModal
-        let boardToAnalyze = savedBoard;
-
-        // Fallback logic...
-        if (!boardToAnalyze) {
-          if (targetBoardId) {
-            boardToAnalyze = updatedBoards.find(
-              (b) => b.board_id === targetBoardId
-            );
-          } else if (updatedBoards.length > 0) {
-            const sortedByCreatedAt = [...updatedBoards].sort((a, b) => {
-              const aTime = new Date(a.created_at || 0).getTime();
-              const bTime = new Date(b.created_at || 0).getTime();
-              return bTime - aTime;
-            });
-            boardToAnalyze = sortedByCreatedAt[0];
-          }
-        }
-
-        const insight = await fetchQuickInsight(
-          updatedBoards,
-          statistics,
-          action,
-          boardToAnalyze?.board_id,
-          boardToAnalyze
-        );
-        setQuickInsight(insight);
-      } catch (error) {
-        console.error("Failed to reload boards:", error);
-      }
-    }
-
-    if (date && timelineRef.current) {
-      timelineRef.current.scrollToDate(date);
-    }
-
+    // 1. 빠른 UI 반응을 위해 모달을 즉시 닫습니다.
     handleCloseEditModal();
+
+    // 2. 필수적인 UI 업데이트를 먼저 수행합니다.
+    try {
+      const updatedBoards = await readBoardsWithTags();
+      setBoards(updatedBoards);
+
+      const updatedTags = await getCurrentUserTags();
+      const newNodeTags: NodeTag[] = updatedTags.map((tag) => ({
+        name: tag.tag_name,
+        color: tag.tag_color,
+      }));
+      setTags(newNodeTags);
+      setRawTags(updatedTags); // rawTags도 업데이트
+
+      if (date && timelineRef.current) {
+        timelineRef.current.scrollToDate(date);
+      }
+
+      // 3. 시간이 걸리는 QuickInsight 요청은 백그라운드에서 처리합니다. (fire-and-forget)
+      (async () => {
+        try {
+          const isUpdate = selectedNodeId !== null;
+          const action = isUpdate ? "update" : "create";
+
+          let boardToAnalyze = savedBoard;
+          if (!boardToAnalyze) {
+            const targetBoardId = selectedNodeId;
+            if (targetBoardId) {
+              boardToAnalyze = updatedBoards.find(
+                (b) => b.board_id === targetBoardId
+              );
+            } else if (updatedBoards.length > 0) {
+              const sortedByCreatedAt = [...updatedBoards].sort(
+                (a, b) =>
+                  new Date(b.created_at || 0).getTime() -
+                  new Date(a.created_at || 0).getTime()
+              );
+              boardToAnalyze = sortedByCreatedAt[0];
+            }
+          }
+
+          const statistics = calculateStatistics(updatedBoards, updatedTags);
+          const insight = await fetchQuickInsight(
+            updatedBoards,
+            statistics,
+            action,
+            boardToAnalyze?.board_id,
+            boardToAnalyze
+          );
+          setQuickInsight(insight);
+        } catch (err) {
+          console.error(
+            "백그라운드에서 Quick Insight를 가져오는 데 실패했습니다:",
+            err
+          );
+          // 이 비필수 기능의 오류로 인해 사용자 UI를 막거나 방해하지 않습니다.
+        }
+      })();
+    } catch (error) {
+      console.error("보드 다시 로드 실패:", error);
+    }
   };
 
   const handleDeleteArchive = async () => {
