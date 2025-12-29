@@ -443,7 +443,17 @@ export default function App() {
   }, [router.query, router]);
 
   return (
-    <>
+    <div
+      className={`bg-[#F2F0EB] relative overflow-auto flex flex-col transition-all duration-500 z-0 `}
+      style={{
+        height: "calc(var(--vh, 1vh) * 100)",
+        backgroundImage: `
+            radial-gradient(circle, rgba(0, 0, 0, 0.15) 1px, transparent 1px),
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' /%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23noise)' opacity='0.06'/%3E%3C/svg%3E")
+          `,
+        backgroundSize: "24px 24px, 400px 400px",
+      }}
+    >
       {/* Login Modal (z-index 50) - 헤더보다 위에 위치 */}
       <LoginModal
         isOpen={!user}
@@ -467,7 +477,9 @@ export default function App() {
 
       {/* [수정됨] Header - 반응형 패딩 */}
       <header
-        className="fixed top-0 left-0 right-0 pointer-events-none z-50"
+        className={`relative flex flex-col transition-all duration-500 z-50 pointer-events-none${
+          !user ? "blur-[2px]" : "blur-0"
+        }`}
         style={{
           paddingTop: "clamp(1rem, 2vw, 2rem)",
           paddingBottom: "clamp(1rem, 2vw, 2rem)",
@@ -541,29 +553,7 @@ export default function App() {
       </header>
 
       {/* [수정됨] Main Content Background - 뷰포트 기반 높이 */}
-      <div
-        className={`bg-[#F2F0EB] relative overflow-auto flex flex-col transition-all duration-500 z-0 ${
-          !user ? "blur-[2px]" : "blur-0"
-        }`}
-        style={{
-          height: "calc(var(--vh, 1vh) * 100)",
-          backgroundImage: `
-            radial-gradient(circle, rgba(0, 0, 0, 0.15) 1px, transparent 1px),
-            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' /%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23noise)' opacity='0.06'/%3E%3C/svg%3E")
-          `,
-          backgroundSize: "24px 24px, 400px 400px",
-        }}
-      >
-        {/* Header Spacer - 반응형 높이 (뷰포트 비율 기반) */}
-        <div
-          className="transition-all duration-700 ease-out"
-          style={{
-            height: user
-              ? "clamp(200px, 30vh, 320px)"
-              : "clamp(180px, 28vh, 280px)",
-          }}
-        />
-
+      <div>
         {/* Search Bar */}
         {isSearching && (
           <div className="pb-8 pt-4">
@@ -577,7 +567,7 @@ export default function App() {
 
         {/* Tags List */}
         <div
-          className="flex justify-center overflow-auto p-8 space-x-8 relative z-10 tags-scrollbar"
+          className="flex justify-center overflow-auto p-8 space-x-8 relative z-50 tags-scrollbar"
           style={{ marginTop: "1rem" }}
         >
           {tags.map((tag, index) => {
@@ -621,7 +611,7 @@ export default function App() {
         </div>
 
         {/* Timeline Section */}
-        <div className="flex-1 flex items-center justify-center w-full min-h-0">
+        <div className="flex-1 flex items-center justify-center w-full min-h-0 mt-10 z-50">
           <Timeline
             onNodeClick={handleNodeClick}
             selectedNodeId={selectedNodeId}
@@ -676,6 +666,6 @@ export default function App() {
             : undefined
         }
       />
-    </>
+    </div>
   );
 }

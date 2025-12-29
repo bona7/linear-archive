@@ -869,7 +869,7 @@ export const Timeline = forwardRef<
     }));
 
     return (
-      <div className="relative w-full px-16 py-16 pb-24">
+      <div className="relative w-full px-16 py-16">
         {/* Scroll Indicators */}
         <div className="absolute left-16 top-8">
           <span
@@ -916,7 +916,7 @@ export const Timeline = forwardRef<
         {/* Timeline Container */}
         <div
           ref={timelineRef}
-          className="relative w-full h-60 overflow-x-auto overflow-y-hidden timeline-container px-8"
+          className="relative w-full h-80 overflow-x-auto overflow-y-hidden timeline-container px-8"
         >
           <div
             className="relative h-full"
